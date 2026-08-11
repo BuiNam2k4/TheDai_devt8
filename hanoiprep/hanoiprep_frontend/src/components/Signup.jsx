@@ -5,6 +5,7 @@ import { AuthContext } from "../context/AuthContext";
 const Signup = () => {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [role, setRole] = useState("ROLE_LEARNER");
   const [successful, setSuccessful] = useState(false);
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
@@ -18,7 +19,7 @@ const Signup = () => {
     setLoading(true);
 
     if (username.length >= 3 && password.length >= 6) {
-      register(username, password).then(
+      register(username, password, role).then(
         (response) => {
           setLoading(false);
           setMessage(response.data.message || "Registration successful!");
@@ -75,6 +76,19 @@ const Signup = () => {
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="Create a password"
                 />
+              </div>
+
+              <div className="form-group">
+                <label htmlFor="role">Role</label>
+                <select
+                  className="form-control"
+                  name="role"
+                  value={role}
+                  onChange={(e) => setRole(e.target.value)}
+                >
+                  <option value="ROLE_LEARNER">Learner</option>
+                  <option value="ROLE_COURSE_PROVIDER">Course Provider</option>
+                </select>
               </div>
 
               <div className="form-group">

@@ -23,6 +23,13 @@ const Navbar = () => {
               Home
             </Link>
           </li>
+          {currentUser?.role === "ROLE_ADMIN" && (
+            <li className="nav-item">
+              <Link to="/admin/users" className="nav-link">
+                User Management
+              </Link>
+            </li>
+          )}
           {currentUser ? (
             <>
               <li className="nav-item">
