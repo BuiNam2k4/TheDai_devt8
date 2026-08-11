@@ -1,0 +1,62 @@
+version: '3.8'
+
+services:
+  # 1. PostgreSQL tích hợp pgvector
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: hanoiprep_postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: 123
+      POSTGRES_DB: hanoiprep_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - hanoiprep-net
+
+  # 2. RabbitMQ (Hàng đợi xử lý ảnh)
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: hanoiprep_rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    networks:
+      - hanoiprep-net
+
+  # 3. Backend Spring Boot
+  backend:
+    build: ./hanoiprep_backend
+    container_name: hanoiprep_backend
+    ports:
+      - "8080:8080"
+    environment:
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/hanoiprep_db
+      - SPRING_DATASOURCE_USERNAME=postgres
+      - SPRING_DATASOURCE_PASSWORD=secretpassword
+      - SPRING_RABBITMQ_HOST=rabbitmq
+    depends_on:
+      - postgres
+      - rabbitmq
+    networks:
+      - hanoiprep-net
+
+  # 4. Frontend React (Vite)
+  frontend:
+    build: ./hanoiprep_frontend
+    container_name: hanoiprep_frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+    networks:
+      - hanoiprep-net
+
+volumes:
+  postgres_data:
+
+networks:
+  hanoiprep-net:
+    driver: bridge
