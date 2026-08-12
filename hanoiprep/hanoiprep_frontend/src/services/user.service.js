@@ -20,9 +20,14 @@ const deleteUser = (id) => {
   return axios.delete(API_URL + "/" + id, { headers: authHeader() });
 };
 
+const activateUser = (id) => {
+  return axios.put(API_URL + "/" + id + "/activate", {}, { headers: authHeader() });
+};
+
 const UserService = {
   getAllUsers,
   deleteUser,
+  activateUser,
 };
 
 export default UserService;

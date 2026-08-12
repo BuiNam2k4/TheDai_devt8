@@ -30,6 +30,20 @@ const Navbar = () => {
               </Link>
             </li>
           )}
+          {currentUser?.role === "ROLE_COURSE_PROVIDER" && (
+            <li className="nav-item">
+              <Link to="/provider/lessons/upload" className="nav-link">
+                Upload Lesson
+              </Link>
+            </li>
+          )}
+          {(currentUser?.role === "ROLE_LEARNER" || currentUser?.role === "ROLE_COURSE_PROVIDER") && (
+            <li className="nav-item">
+              <Link to="/learner/lessons" className="nav-link">
+                Lessons
+              </Link>
+            </li>
+          )}
           {currentUser ? (
             <>
               <li className="nav-item">
