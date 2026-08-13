@@ -431,3 +431,14 @@ a {
   color: var(--text-muted);
   border-color: var(--border-color);
 }
+
+/* Spinner animation */
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+/* Text color alias */
+:root {
+  --text-primary: var(--text-main);
+}

@@ -1,15 +1,18 @@
 import React, { useState, useEffect, useContext } from 'react';
 import axios from 'axios';
+import { useNavigate } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
 import authHeader from '../services/auth-header';
 
 const LessonView = () => {
   const { currentUser } = useContext(AuthContext);
+  const navigate = useNavigate();
   const [availableLessons, setAvailableLessons] = useState([]);
   const [selectedLesson, setSelectedLesson] = useState(null);
   const [submissions, setSubmissions] = useState([]);
   const [selectedPdfUrl, setSelectedPdfUrl] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [answerText, setAnswerText] = useState('');
 
   useEffect(() => {
     fetchLessons();
@@ -51,6 +54,14 @@ const LessonView = () => {
       alert("No lesson selected.");
       return;
     }
+    const fileInput = document.getElementById('assignmentFileInput');
+    const hasFile = fileInput && fileInput.files && fileInput.files[0];
+    const hasText = answerText && answerText.trim().length > 0;
+
+    if (!hasText && !hasFile) {
+      alert("Vui lòng nhập bài làm văn bản HOẶC tải lên file PDF bài làm trước khi nộp.");
+      return;
+    }
 
     if (isSubmitting) return;
     setIsSubmitting(true);
@@ -59,19 +70,25 @@ const LessonView = () => {
       const formData = new FormData();
       formData.append('userId', currentUser.id);
       formData.append('lessonId', selectedLesson.id);
+      formData.append('answerText', answerText.trim());
 
       const fileInput = document.getElementById('assignmentFileInput');
       if (fileInput && fileInput.files[0]) {
         formData.append('answerFile', fileInput.files[0]);
       }
 
-      await axios.post('http://localhost:8080/api/submissions', formData, {
+      const res = await axios.post('http://localhost:8080/api/submissions', formData, {
         headers: authHeader()
       });
 
-      alert("Assignment submitted successfully!");
-      if (fileInput) fileInput.value = '';
-      window.location.reload(); // Reset page luôn
+      // Navigate đến trang kết quả chấm điểm AI
+      const submissionId = res.data?.id;
+      if (submissionId) {
+        navigate(`/submission/${submissionId}/result`);
+      } else {
+        alert("Nộp bài thành công! Đang tải kết quả...");
+        window.location.reload();
+      }
     } catch (error) {
       console.error("Error submitting assignment", error);
       alert("Error submitting assignment: " + (error.response?.data || error.message));
@@ -178,15 +195,36 @@ const LessonView = () => {
 
             {currentUser?.role !== 'ROLE_COURSE_PROVIDER' && currentUser?.role !== 'ROLE_ADMIN' && (
               <>
-                <h3 style={{ marginBottom: '1rem' }}>Submit Answer</h3>
+                <h3 style={{ marginBottom: '0.5rem' }}>Submit Answer</h3>
+                <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '1rem' }}>
+                  🤖 Sau khi nộp bài, AI sẽ tự động chấm điểm và hiển thị kết quả.
+                </p>
                 <form onSubmit={handleSubmitAssignment}>
                   <div className="form-group">
-                    <label>Upload Assignment File (PDF or Image)</label>
-                    <input id="assignmentFileInput" type="file" accept=".pdf,image/*" className="form-control" required />
+                    <label>Bài làm văn bản (Tùy chọn)</label>
+                    <textarea
+                      className="form-control"
+                      rows="6"
+                      placeholder="Nhập bài làm của bạn vào đây (hoặc đính kèm file PDF bài làm ở dưới)..."
+                      value={answerText}
+                      onChange={(e) => setAnswerText(e.target.value)}
+                      style={{ resize: 'vertical' }}
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label>Tải lên file bài làm (Tùy chọn – PDF)</label>
+                    <input id="assignmentFileInput" type="file" accept=".pdf,image/*" className="form-control" />
                   </div>
 
-                  <button type="submit" className="auth-btn" disabled={isSubmitting} style={{ opacity: isSubmitting ? 0.7 : 1, cursor: isSubmitting ? 'not-allowed' : 'pointer' }}>
-                    {isSubmitting ? 'Đang nộp bài...' : 'Submit Work'}
+                  <button
+                    type="submit"
+                    className="auth-btn"
+                    disabled={isSubmitting}
+                    style={{ opacity: isSubmitting ? 0.75 : 1, cursor: isSubmitting ? 'not-allowed' : 'pointer' }}
+                  >
+                    {isSubmitting
+                      ? '🤖 AI đang chấm bài... Vui lòng chờ'
+                      : '📤 Nộp bài & Chấm điểm AI'}
                   </button>
                 </form>
               </>
