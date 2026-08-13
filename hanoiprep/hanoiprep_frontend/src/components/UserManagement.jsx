@@ -30,14 +30,27 @@ const UserManagement = () => {
     );
   };
 
-  const handleDelete = (id) => {
-    if (window.confirm("Are you sure you want to delete this user?")) {
+  const handleDeactivate = (id) => {
+    if (window.confirm("Are you sure you want to deactivate this user?")) {
       UserService.deleteUser(id).then(
         () => {
           fetchUsers();
         },
         (error) => {
-          setMessage("Failed to delete user.");
+          setMessage("Failed to deactivate user.");
+        }
+      );
+    }
+  };
+
+  const handleActivate = (id) => {
+    if (window.confirm("Are you sure you want to activate this user?")) {
+      UserService.activateUser(id).then(
+        () => {
+          fetchUsers();
+        },
+        (error) => {
+          setMessage("Failed to activate user.");
         }
       );
     }
@@ -48,7 +61,7 @@ const UserManagement = () => {
       <div className="admin-card">
         <h2 className="admin-title">User Management</h2>
         {message && <div className="alert alert-danger">{message}</div>}
-        
+
         <div className="table-responsive">
           <table className="admin-table">
             <thead>
@@ -56,6 +69,7 @@ const UserManagement = () => {
                 <th>ID</th>
                 <th>Username</th>
                 <th>Role</th>
+                <th>Status</th>
                 <th>Actions</th>
               </tr>
             </thead>
@@ -66,18 +80,34 @@ const UserManagement = () => {
                   <td>{user.username}</td>
                   <td>
                     <span className={`badge ${user.role}`}>
-                      {user.role === 'ROLE_ADMIN' ? 'Admin' : 
-                       user.role === 'ROLE_COURSE_PROVIDER' ? 'Course Provider' : 'Learner'}
+                      {user.role === 'ROLE_ADMIN' ? 'Admin' :
+                        user.role === 'ROLE_COURSE_PROVIDER' ? 'Course Provider' : 'Learner'}
                     </span>
                   </td>
                   <td>
-                    <button
-                      className="btn-delete"
-                      onClick={() => handleDelete(user.id)}
-                      disabled={user.role === 'ROLE_ADMIN'}
-                    >
-                      Delete
-                    </button>
+                    <span style={{ color: user.active ? 'var(--success)' : 'var(--danger)', fontWeight: 'bold' }}>
+                      {user.active ? 'Active' : 'Deactive'}
+                    </span>
+                  </td>
+                  <td>
+                    {user.role === 'ROLE_ADMIN' ? (
+                      <span style={{ color: 'var(--text-muted)', fontStyle: 'italic' }}>Active</span>
+                    ) : user.active ? (
+                      <button
+                        className="btn-delete"
+                        onClick={() => handleDeactivate(user.id)}
+                      >
+                        Deactivate
+                      </button>
+                    ) : (
+                      <button
+                        className="btn btn-primary"
+                        style={{ padding: '0.4rem 0.8rem', fontSize: '0.85rem' }}
+                        onClick={() => handleActivate(user.id)}
+                      >
+                        Activate
+                      </button>
+                    )}
                   </td>
                 </tr>
               ))}
