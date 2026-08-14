@@ -24,8 +24,13 @@ const activateUser = (id) => {
   return axios.put(API_URL + "/" + id + "/activate", {}, { headers: authHeader() });
 };
 
+const createUser = (userData) => {
+  return axios.post(API_URL, userData, { headers: authHeader() });
+};
+
 const UserService = {
   getAllUsers,
+  createUser,
   deleteUser,
   activateUser,
 };
