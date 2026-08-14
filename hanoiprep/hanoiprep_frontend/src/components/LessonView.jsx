@@ -1,13 +1,18 @@
 import React, { useState, useEffect, useContext } from 'react';
 import axios from 'axios';
+import { useNavigate } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
 import authHeader from '../services/auth-header';
 
 const LessonView = () => {
   const { currentUser } = useContext(AuthContext);
+  const navigate = useNavigate();
   const [availableLessons, setAvailableLessons] = useState([]);
   const [selectedLesson, setSelectedLesson] = useState(null);
-  const [assignmentText, setAssignmentText] = useState('');
+  const [submissions, setSubmissions] = useState([]);
+  const [selectedPdfUrl, setSelectedPdfUrl] = useState(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [answerText, setAnswerText] = useState('');
 
   useEffect(() => {
     fetchLessons();
@@ -15,16 +20,28 @@ const LessonView = () => {
 
   const fetchLessons = async () => {
     try {
-      const res = await axios.get('http://localhost:8080/api/knowledge-base', { headers: authHeader() });
-      setAvailableLessons(res.data);
+      const res = await axios.get('http://localhost:8080/api/lessons', { headers: authHeader() });
+      
+      // Filter lessons: only show if they have both question and solution files
+      const validLessons = res.data.filter(lesson => lesson.questionFileUrl && lesson.solutionFileUrl);
+      
+      setAvailableLessons(validLessons);
     } catch (error) {
       console.error("Error fetching lessons", error);
     }
   };
 
-  const handleSelectLesson = (lesson) => {
+  const handleSelectLesson = async (lesson) => {
     setSelectedLesson(lesson);
-    setAssignmentText('');
+    if (currentUser?.role === 'ROLE_COURSE_PROVIDER') {
+      try {
+        const res = await axios.get(`http://localhost:8080/api/submissions/lesson/${lesson.id}`, { headers: authHeader() });
+        setSubmissions(res.data);
+      } catch (error) {
+        console.error("Error fetching submissions", error);
+      }
+    }
+    setSelectedPdfUrl(null);
   };
 
   const handleSubmitAssignment = async (e) => {
@@ -33,38 +50,68 @@ const LessonView = () => {
       alert("Please login first.");
       return;
     }
-    if (!selectedLesson || !selectedLesson.questions || selectedLesson.questions.length === 0) {
-      alert("No questions found in this lesson to submit for.");
+    if (!selectedLesson) {
+      alert("No lesson selected.");
+      return;
+    }
+    const fileInput = document.getElementById('assignmentFileInput');
+    const hasFile = fileInput && fileInput.files && fileInput.files[0];
+    const hasText = answerText && answerText.trim().length > 0;
+
+    if (!hasText && !hasFile) {
+      alert("Vui lòng nhập bài làm văn bản HOẶC tải lên file PDF bài làm trước khi nộp.");
       return;
     }
 
+    if (isSubmitting) return;
+    setIsSubmitting(true);
+
     try {
-      // Assuming we submit for the first question in the lesson for simplicity,
-      // or we could loop and submit multiple. Usually it's one submission per question.
-      const qId = selectedLesson.questions[0].id;
-      
       const formData = new FormData();
       formData.append('userId', currentUser.id);
-      formData.append('questionId', qId);
-      if (assignmentText) {
-        formData.append('answerText', assignmentText);
-      }
+      formData.append('lessonId', selectedLesson.id);
+      formData.append('answerText', answerText.trim());
 
       const fileInput = document.getElementById('assignmentFileInput');
       if (fileInput && fileInput.files[0]) {
         formData.append('answerFile', fileInput.files[0]);
       }
 
-      await axios.post('http://localhost:8080/api/submissions', formData, {
+      const res = await axios.post('http://localhost:8080/api/submissions', formData, {
         headers: authHeader()
       });
 
-      alert("Assignment submitted successfully!");
-      setAssignmentText('');
-      if (fileInput) fileInput.value = '';
+      // Navigate đến trang kết quả chấm điểm AI
+      const submissionId = res.data?.id;
+      if (submissionId) {
+        navigate(`/submission/${submissionId}/result`);
+      } else {
+        alert("Nộp bài thành công! Đang tải kết quả...");
+        window.location.reload();
+      }
     } catch (error) {
       console.error("Error submitting assignment", error);
       alert("Error submitting assignment: " + (error.response?.data || error.message));
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleDownload = async (url, filename) => {
+    try {
+      const response = await fetch(url);
+      const blob = await response.blob();
+      // Force it to be a PDF type
+      const blobUrl = window.URL.createObjectURL(new Blob([blob], { type: 'application/pdf' }));
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      link.setAttribute('download', filename || 'document.pdf');
+      document.body.appendChild(link);
+      link.click();
+      link.parentNode.removeChild(link);
+    } catch (error) {
+      console.error("Error downloading file:", error);
+      window.open(url, '_blank'); // fallback
     }
   };
 
@@ -102,72 +149,109 @@ const LessonView = () => {
         {selectedLesson ? (
           <div>
             <h2 className="admin-title">{selectedLesson.title}</h2>
-            <div style={{ marginBottom: '2rem', padding: '1rem', background: 'var(--input-bg)', borderRadius: '0.75rem' }}>
-              <p style={{ color: 'var(--text-muted)' }}>{selectedLesson.contentText || selectedLesson.description}</p>
-              {selectedLesson.materialFileUrl && (
-                <div style={{ marginTop: '1rem' }}>
-                  <a href={selectedLesson.materialFileUrl} target="_blank" rel="noreferrer" style={{ color: 'var(--primary-color)', textDecoration: 'underline' }}>
-                    Download Material (PDF)
-                  </a>
-                </div>
-              )}
-            </div>
-
-            <hr style={{ borderColor: 'var(--border-color)', margin: '2rem 0' }} />
-
-            {selectedLesson.questions && selectedLesson.questions.length > 0 && (
-              <div style={{ marginBottom: '2rem' }}>
-                <h3 style={{ marginBottom: '1rem' }}>Assignment Questions</h3>
-                <ul style={{ listStyleType: 'none', padding: 0 }}>
-                  {selectedLesson.questions.map((q, idx) => (
-                    <li key={idx} style={{ 
-                      background: 'var(--input-bg)', 
-                      padding: '1rem', 
-                      borderRadius: '0.5rem',
-                      marginBottom: '0.75rem',
-                      borderLeft: '4px solid var(--primary-color)'
-                    }}>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                        <div>
-                          <strong style={{ color: 'var(--primary-color)', marginRight: '0.5rem' }}>Question {idx + 1}:</strong> 
-                          {q.contentLatex && <span>{q.contentLatex}</span>}
-                        </div>
-                        {q.questionFileUrl && (
-                          <div>
-                            <a href={q.questionFileUrl} target="_blank" rel="noreferrer" style={{ color: 'var(--success)', textDecoration: 'underline', fontSize: '0.9rem' }}>
-                              📎 Download Attachment
-                            </a>
-                          </div>
-                        )}
-                      </div>
-                    </li>
-                  ))}
-                </ul>
+            {(selectedLesson.contentText || selectedLesson.description || selectedLesson.materialFileUrl) && (
+              <div style={{ marginBottom: '2rem', padding: '1rem', background: 'var(--input-bg)', borderRadius: '0.75rem' }}>
+                {(selectedLesson.contentText || selectedLesson.description) && (
+                  <p style={{ color: 'var(--text-muted)' }}>{selectedLesson.contentText || selectedLesson.description}</p>
+                )}
+                {selectedLesson.materialFileUrl && (
+                  <div style={{ marginTop: '1rem' }}>
+                    <a href="#" onClick={(e) => { e.preventDefault(); handleDownload(selectedLesson.materialFileUrl, 'TaiLieu.pdf'); }} style={{ color: 'var(--primary-color)', textDecoration: 'underline' }}>
+                      📎 Tải Tài Liệu Bài Học (PDF)
+                    </a>
+                  </div>
+                )}
               </div>
             )}
 
-            <h3 style={{ marginBottom: '1rem' }}>Submit Answer (Essay)</h3>
-            <form onSubmit={handleSubmitAssignment}>
-              <div className="form-group">
-                <label>Upload Assignment File (PDF)</label>
-                <input id="assignmentFileInput" type="file" accept="application/pdf" className="form-control" />
-              </div>
+            <hr style={{ borderColor: 'var(--border-color)', margin: '2rem 0' }} />
 
-              <div className="form-group">
-                <label>Or Write Answer Here</label>
-                <textarea 
-                  className="form-control" 
-                  rows="5"
-                  value={assignmentText}
-                  onChange={(e) => setAssignmentText(e.target.value)}
-                  placeholder="Type your answer..."
-                />
+            <div style={{ marginBottom: '2rem' }}>
+              <h3 style={{ marginBottom: '1rem' }}>Assignment / Exercise</h3>
+              <div style={{ 
+                background: 'var(--input-bg)', 
+                padding: '1rem', 
+                borderRadius: '0.5rem',
+                borderLeft: '4px solid var(--primary-color)'
+              }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                  {selectedLesson.questionFileUrl && (
+                    <div>
+                      <a href="#" onClick={(e) => { e.preventDefault(); handleDownload(selectedLesson.questionFileUrl, 'DeBai.pdf'); }} style={{ color: 'var(--success)', textDecoration: 'underline', fontSize: '0.9rem' }}>
+                        📎 Tải Đề Bài (PDF)
+                      </a>
+                    </div>
+                  )}
+                  {selectedLesson.solutionFileUrl && currentUser?.role === 'ROLE_COURSE_PROVIDER' && (
+                    <div>
+                      <a href="#" onClick={(e) => { e.preventDefault(); handleDownload(selectedLesson.solutionFileUrl, 'DapAn.pdf'); }} style={{ color: 'var(--success)', textDecoration: 'underline', fontSize: '0.9rem' }}>
+                        📎 Tải Đáp Án / Hướng Dẫn Giải (Dành cho Provider)
+                      </a>
+                    </div>
+                  )}
+                </div>
               </div>
+            </div>
 
-              <button type="submit" className="auth-btn">
-                Submit Work
-              </button>
-            </form>
+            {currentUser?.role !== 'ROLE_COURSE_PROVIDER' && currentUser?.role !== 'ROLE_ADMIN' && (
+              <>
+                <h3 style={{ marginBottom: '0.5rem' }}>Submit Answer</h3>
+                <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '1rem' }}>
+                  🤖 Sau khi nộp bài, AI sẽ tự động chấm điểm và hiển thị kết quả.
+                </p>
+                <form onSubmit={handleSubmitAssignment}>
+                  <div className="form-group">
+                    <label>Bài làm văn bản (Tùy chọn)</label>
+                    <textarea
+                      className="form-control"
+                      rows="6"
+                      placeholder="Nhập bài làm của bạn vào đây (hoặc đính kèm file PDF bài làm ở dưới)..."
+                      value={answerText}
+                      onChange={(e) => setAnswerText(e.target.value)}
+                      style={{ resize: 'vertical' }}
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label>Tải lên file bài làm (Tùy chọn – PDF)</label>
+                    <input id="assignmentFileInput" type="file" accept=".pdf,image/*" className="form-control" />
+                  </div>
+
+                  <button
+                    type="submit"
+                    className="auth-btn"
+                    disabled={isSubmitting}
+                    style={{ opacity: isSubmitting ? 0.75 : 1, cursor: isSubmitting ? 'not-allowed' : 'pointer' }}
+                  >
+                    {isSubmitting
+                      ? '🤖 AI đang chấm bài... Vui lòng chờ'
+                      : '📤 Nộp bài & Chấm điểm AI'}
+                  </button>
+                </form>
+              </>
+            )}
+
+            {currentUser?.role === 'ROLE_COURSE_PROVIDER' && (
+              <div style={{ marginTop: '3rem' }}>
+                <h3 style={{ marginBottom: '1rem', color: 'var(--primary-color)' }}>Student Submissions</h3>
+                {submissions.length > 0 ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                    {submissions.map(sub => (
+                      <div key={sub.id} style={{ background: 'var(--input-bg)', padding: '1rem', borderRadius: '0.5rem', border: '1px solid var(--border-color)' }}>
+                        <p><strong>User ID:</strong> {sub.user?.username || sub.user?.id || 'Unknown'}</p>
+                        <p><strong>Submitted At:</strong> {new Date(sub.createdAt).toLocaleString()}</p>
+                        {sub.answerFileUrl && (
+                          <button onClick={() => handleDownload(sub.answerFileUrl, `Submission_${sub.id}`)} style={{ marginTop: '0.5rem', background: 'var(--primary-color)', color: 'white', border: 'none', padding: '0.5rem 1rem', borderRadius: '0.25rem', cursor: 'pointer' }}>
+                            Download File
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p style={{ color: 'var(--text-muted)' }}>No submissions yet.</p>
+                )}
+              </div>
+            )}
           </div>
         ) : (
           <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%', color: 'var(--text-muted)' }}>

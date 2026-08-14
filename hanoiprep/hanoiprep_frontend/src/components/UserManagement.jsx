@@ -113,7 +113,7 @@ const UserManagement = () => {
               ))}
               {users.length === 0 && (
                 <tr>
-                  <td colSpan="4" className="text-center">No users found.</td>
+                  <td colSpan="5" className="text-center">No users found.</td>
                 </tr>
               )}
             </tbody>

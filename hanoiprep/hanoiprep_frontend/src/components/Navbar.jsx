@@ -33,7 +33,7 @@ const Navbar = () => {
           {currentUser?.role === "ROLE_COURSE_PROVIDER" && (
             <li className="nav-item">
               <Link to="/provider/lessons/upload" className="nav-link">
-                Upload Lesson
+                Create Lesson
               </Link>
             </li>
           )}
