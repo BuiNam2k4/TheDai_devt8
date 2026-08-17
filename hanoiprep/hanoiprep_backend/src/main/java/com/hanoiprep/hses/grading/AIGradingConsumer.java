@@ -17,9 +17,10 @@ public class AIGradingConsumer {
 
     @RabbitListener(queues = RabbitMQConfig.QUEUE)
     public void processGradingTask(Long submissionId) {
-        log.info("Received submissionId {} from RabbitMQ queue. Processing AI grading...", submissionId);
+        log.info("Processing AI grading...", submissionId);
         try {
-            // Throttling 500ms giữa các request để phòng tránh Rate Limit (429) của Gemini API
+            // Throttling 500ms giữa các request để phòng tránh Rate Limit (429) của Gemini
+            // API
             Thread.sleep(500);
             aiGradingService.gradeSubmission(submissionId);
             log.info("Successfully processed submissionId {} from RabbitMQ queue", submissionId);

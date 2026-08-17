@@ -6,6 +6,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.hanoiprep.hses.chatbot.GeminiService;
 import com.hanoiprep.hses.rubric.Rubric;
 import com.hanoiprep.hses.rubric.RubricExtractionService;
+import com.hanoiprep.hses.rubric.RubricRepository;
 import com.hanoiprep.hses.submission.Submission;
 import com.hanoiprep.hses.submission.SubmissionDetail;
 import com.hanoiprep.hses.submission.SubmissionDetailRepository;
@@ -26,6 +27,7 @@ public class AIGradingService {
     private final SubmissionRepository submissionRepository;
     private final SubmissionDetailRepository submissionDetailRepository;
     private final RubricExtractionService rubricExtractionService;
+    private final RubricRepository rubricRepository;
     private final ObjectMapper objectMapper = new ObjectMapper()
             .configure(com.fasterxml.jackson.databind.DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
     private final GeminiService geminiService;
@@ -42,11 +44,15 @@ public class AIGradingService {
         Submission submission = submissionRepository.findById(submissionId)
                 .orElseThrow(() -> new RuntimeException("Submission not found"));
 
-        // Tự động xóa toàn bộ tiêu chí mẫu cũ trong DB và sinh tiêu chí mới 100% từ
-        // file đáp án (solution) bằng AI
-        List<Rubric> rubrics = rubricExtractionService.extractAndSaveRubricsFromLessonEntity(submission.getLesson());
+        // 1. Tối ưu: Lấy rubrics có sẵn trong DB theo lessonId
+        List<Rubric> rubrics = rubricRepository.findByLessonId(submission.getLesson().getId());
 
-        // Chấm điểm chi tiết theo các tiêu chí đã sinh từ file đáp án
+        // 2. Nếu bài học chưa từng có rubric, mới gọi AI để sinh và lưu vào DB lần đầu
+        if (rubrics == null || rubrics.isEmpty()) {
+            rubrics = rubricExtractionService.extractAndSaveRubricsFromLessonEntity(submission.getLesson());
+        }
+
+        // 3. Chấm điểm chi tiết theo các tiêu chí rubric
         gradeWithRubrics(submission, rubrics);
     }
 
