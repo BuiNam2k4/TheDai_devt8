@@ -28,9 +28,14 @@ const createUser = (userData) => {
   return axios.post(API_URL, userData, { headers: authHeader() });
 };
 
+const updateUser = (id, userData) => {
+  return axios.put(API_URL + "/" + id, userData, { headers: authHeader() });
+};
+
 const UserService = {
   getAllUsers,
   createUser,
+  updateUser,
   deleteUser,
   activateUser,
 };

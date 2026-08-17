@@ -17,6 +17,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.client.RestTemplate;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -71,6 +72,8 @@ public class AIGradingService {
         gradeWithRubrics(submission, rubrics);
     }
 
+    private final RestTemplate restTemplate = new RestTemplate();
+
     // ─────────────────────────────────────────────────────────────────────────
     // Chấm theo barem Rubric (đã được trích xuất từ file đáp án)
     // Mục tiêu: với mỗi tiêu chí rubric, AI đánh giá bài làm học sinh có
@@ -80,12 +83,30 @@ public class AIGradingService {
         double totalMaxScore = rubrics.stream().mapToDouble(Rubric::getMaxScore).sum();
         String studentAnswer = submission.getAnswerText() != null && !submission.getAnswerText().isBlank()
                 ? submission.getAnswerText()
-                : "Học sinh không nhập câu trả lời hoặc bài nộp trống.";
+                : "";
 
-        // ── Kỹ thuật "Per-criterion forced evaluation" ──
-        // Thay vì liệt kê barem rồi nhờ AI tự suy, ta mô tả TỪNG tiêu chí như
-        // một câu hỏi độc lập: "Tìm bằng chứng trong bài → kết luận → cho điểm"
-        // Cách này buộc AI đọc bài làm nhiều lần (1 lần / tiêu chí), không tổng hợp chung.
+        // 1. Tải file bài làm của học sinh nếu có (PDF hoặc Ảnh scan)
+        byte[] studentFileBytes = null;
+        String mimeType = "application/pdf";
+        if (submission.getAnswerFileUrl() != null && !submission.getAnswerFileUrl().isBlank()) {
+            try {
+                studentFileBytes = restTemplate.getForObject(submission.getAnswerFileUrl(), byte[].class);
+                String lowerUrl = submission.getAnswerFileUrl().toLowerCase();
+                if (lowerUrl.endsWith(".jpg") || lowerUrl.endsWith(".jpeg")) {
+                    mimeType = "image/jpeg";
+                } else if (lowerUrl.endsWith(".png")) {
+                    mimeType = "image/png";
+                } else {
+                    mimeType = "application/pdf";
+                }
+                log.info("Downloaded student answer file ({} bytes, mime: {}) for submission {}",
+                        studentFileBytes != null ? studentFileBytes.length : 0, mimeType, submission.getId());
+            } catch (Exception e) {
+                log.warn("Could not download student answer file from URL [{}]: {}", submission.getAnswerFileUrl(), e.getMessage());
+            }
+        }
+
+        // 2. Chuẩn bị khối tiêu chí barem
         StringBuilder criteriaBlock = new StringBuilder();
         for (int idx = 0; idx < rubrics.size(); idx++) {
             Rubric r = rubrics.get(idx);
@@ -96,8 +117,7 @@ public class AIGradingService {
                     + "  Yêu cầu: %s\n"
                     + "  Điểm tối đa: %.2f\n"
                     + "  Từ/cụm từ kỹ thuật cần tìm: %s\n"
-                    + "  → Hãy trích dẫn NGUYÊN VĂN đoạn trong bài làm liên quan đến tiêu chí này (nếu không tìm thấy ghi \"Không tìm thấy\").\n"
-                    + "  → Đánh giá: đúng / sai / đúng một phần → cho điểm từ 0 đến %.2f.\n\n",
+                    + "  → Đánh giá: đúng / sai / đúng một phần → cho điểm từ 0.0 đến %.2f.\n\n",
                     idx + 1, r.getId(),
                     r.getQuestionNo() != null ? r.getQuestionNo() : "Câu 1",
                     r.getStepOrder(),
@@ -108,27 +128,61 @@ public class AIGradingService {
             ));
         }
 
-        String prompt = "Bạn là giáo viên chấm thi chuyên nghiệp. Hãy chấm điểm BÀI LÀM sau theo từng tiêu chí độc lập.\n\n"
-                + "══════════════════════════════════════\n"
-                + "BÀI LÀM CỦA HỌC SINH\n"
-                + "══════════════════════════════════════\n"
-                + studentAnswer
-                + "\n\n══════════════════════════════════════\n"
-                + "CÁC TIÊU CHÍ CẦN CHẤM (" + rubrics.size() + " tiêu chí, tổng = "
-                + String.format("%.2f", totalMaxScore) + " điểm)\n"
-                + "══════════════════════════════════════\n"
-                + criteriaBlock
-                + "══════════════════════════════════════\n"
-                + "QUAN TRỌNG: Chấm MỖI TIÊU CHÍ HOÀN TOÀN ĐỘC LẬP.\n"
-                + "- KHÔNG chấm theo cảm nhận tổng thể bài làm.\n"
-                + "- KHÔNG cho điểm cao vì bài làm nhìn chung tốt hay điểm thấp vì bài nhìn chung yếu.\n"
-                + "- CHỈ căn cứ vào: tiêu chí đó yêu cầu gì + bài làm có làm đúng yêu cầu đó không.\n"
-                + "- Nếu học sinh làm đúng yêu cầu của tiêu chí → cho điểm tối đa của tiêu chí đó.\n"
-                + "- Nếu không tìm thấy bằng chứng → awardedScore = 0.0.\n\n"
-                + "Trả về ĐÚNG " + rubrics.size() + " phần tử JSON, KHÔNG có markdown:\n"
-                + "[{\"rubricId\": <số_nguyên_từ_rubricId=>, \"awardedScore\": <số_thực_0_đến_maxScore>, \"aiFeedback\": \"<trích_dẫn_và_nhận_xét_ngắn>\"}]";
+        // 3. Thông tin đề bài gốc
+        String lessonTitle = submission.getLesson() != null && submission.getLesson().getTitle() != null
+                ? submission.getLesson().getTitle() : "Bài tập";
+        String lessonContent = submission.getLesson() != null && submission.getLesson().getContentText() != null
+                ? submission.getLesson().getContentText() : "";
 
-        String rawAiResponse = geminiService.callGemini(prompt);
+        // 4. Tạo Prompt chuyên sâu có cấu trúc 3 khối rõ ràng
+        StringBuilder promptBuilder = new StringBuilder();
+        promptBuilder.append("Bạn là giáo viên chấm thi giàu kinh nghiệm và công tâm. Hãy chấm điểm bài làm của học sinh theo thang điểm chi tiết (Rubrics) dưới đây.\n\n");
+
+        promptBuilder.append("═══════════════════════════════════════════\n");
+        promptBuilder.append("## KHỐI 1: THÔNG TIN BÀI HỌC & ĐỀ BÀI GỐC\n");
+        promptBuilder.append("═══════════════════════════════════════════\n");
+        promptBuilder.append("Tên bài: ").append(lessonTitle).append("\n");
+        if (!lessonContent.isBlank()) {
+            promptBuilder.append("Nội dung đề bài:\n").append(lessonContent).append("\n");
+        }
+        promptBuilder.append("\n");
+
+        promptBuilder.append("═══════════════════════════════════════════\n");
+        promptBuilder.append("## KHỐI 2: BAREM TIÊU CHÍ CHẤM ĐIỂM (").append(rubrics.size()).append(" tiêu chí, Tổng = ")
+                .append(String.format("%.2f", totalMaxScore)).append(" điểm)\n");
+        promptBuilder.append("═══════════════════════════════════════════\n");
+        promptBuilder.append(criteriaBlock).append("\n");
+
+        promptBuilder.append("═══════════════════════════════════════════\n");
+        promptBuilder.append("## KHỐI 3: BÀI LÀM CỦA HỌC SINH\n");
+        promptBuilder.append("═══════════════════════════════════════════\n");
+        if (!studentAnswer.isBlank()) {
+            promptBuilder.append("Nội dung văn bản học sinh nhập:\n").append(studentAnswer).append("\n\n");
+        }
+        if (studentFileBytes != null && studentFileBytes.length > 0) {
+            promptBuilder.append("Học sinh có nộp file bài làm đính kèm (ảnh chụp / PDF bài viết tay). Vui lòng đọc kỹ hình ảnh/PDF đính kèm để chấm.\n\n");
+        }
+        if (studentAnswer.isBlank() && (studentFileBytes == null || studentFileBytes.length == 0)) {
+            promptBuilder.append("Học sinh không nhập câu trả lời và không đính kèm file bài làm.\n\n");
+        }
+
+        promptBuilder.append("═══════════════════════════════════════════\n");
+        promptBuilder.append("## NGUYÊN TẮC CHẤM ĐIỂM SƯ PHẠM (QUAN TRỌNG):\n");
+        promptBuilder.append("═══════════════════════════════════════════\n");
+        promptBuilder.append("1. **Độc lập và Khách quan:** Chấm từng tiêu chí căn cứ theo mức độ hoàn thành trong bài làm.\n");
+        promptBuilder.append("2. **Chấm điểm theo phương pháp (Method Marks):** Nếu học sinh tính toán nhầm số liệu ở bước trên nhưng phương pháp lập luận ở bước dưới vẫn đúng logic $\\to$ Vẫn cho điểm phương pháp của bước dưới, không được cho 0 toàn bộ bài.\n");
+        promptBuilder.append("3. **Chỉ cho 0 điểm:** Khi học sinh hoàn toàn không làm tiêu chí đó hoặc sai bản chất lý thuyết nghiêm trọng.\n");
+        promptBuilder.append("4. **Nhận xét súc tích:** Trong `aiFeedback`, trích dẫn ngắn gọn phần học sinh làm được/chưa được và lý do trừ điểm (nếu có).\n\n");
+
+        promptBuilder.append("Trả về ĐÚNG ").append(rubrics.size()).append(" phần tử JSON, KHÔNG bọc markdown ```json:\n");
+        promptBuilder.append("[{\"rubricId\": <số_nguyên_từ_rubricId=>, \"awardedScore\": <số_thực_0_đến_maxScore>, \"aiFeedback\": \"<nhận_xét_ngắn_gọn>\"}]");
+
+        String rawAiResponse;
+        if (studentFileBytes != null && studentFileBytes.length > 0) {
+            rawAiResponse = geminiService.callGeminiWithMedia(promptBuilder.toString(), studentFileBytes, mimeType);
+        } else {
+            rawAiResponse = geminiService.callGemini(promptBuilder.toString());
+        }
 
         JsonNode rootNode = objectMapper.readTree(rawAiResponse);
         String coreJson = rootNode.path("candidates").get(0)
@@ -152,7 +206,6 @@ public class AIGradingService {
         }
 
         double totalScore = 0.0;
-        java.util.Set<String> failedQuestionsSet = new java.util.HashSet<>();
         List<SubmissionDetail> detailsToSave = new ArrayList<>();
 
         for (int i = 0; i < results.size(); i++) {
@@ -169,24 +222,11 @@ public class AIGradingService {
                             .findFirst()
                             .orElseGet(() -> index < rubrics.size() ? rubrics.get(index) : rubrics.get(0)));
 
-            String qNo = matchedRubric.getQuestionNo() != null ? matchedRubric.getQuestionNo() : "Câu 1";
             double rawScore = result.getAwardedScore() != null ? result.getAwardedScore() : 0.0;
             String feedback = result.getAiFeedback() != null ? result.getAiFeedback() : "Đã hoàn thành tiêu chí.";
 
-            double finalScore;
-
-            if (failedQuestionsSet.contains(qNo)) {
-                // Bước trước trong cùng câu đã sai → bước này = 0 điểm
-                finalScore = 0.0;
-                feedback = "Không được tính điểm do bước trước đó trong " + qNo + " đã bị làm sai hoặc thiếu.";
-            } else {
-                // Đảm bảo điểm không vượt quá trần và làm tròn 2 chữ số
-                finalScore = Math.round(Math.min(rawScore, matchedRubric.getMaxScore()) * 100.0) / 100.0;
-                // Nếu bước này không đạt điểm tối đa → đánh dấu câu này bị hỏng các bước sau
-                if (finalScore < matchedRubric.getMaxScore()) {
-                    failedQuestionsSet.add(qNo);
-                }
-            }
+            // Đảm bảo điểm nằm trong khoảng 0 đến maxScore và làm tròn 2 chữ số thập phân
+            double finalScore = Math.round(Math.min(Math.max(0.0, rawScore), matchedRubric.getMaxScore()) * 100.0) / 100.0;
 
             detailsToSave.add(SubmissionDetail.builder()
                     .submission(submission)

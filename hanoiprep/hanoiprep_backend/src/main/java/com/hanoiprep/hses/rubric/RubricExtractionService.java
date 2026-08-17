@@ -172,39 +172,69 @@ public class RubricExtractionService {
     // ─────────────────────────────────────────────────────────────────────────
     // Bước 2: Gọi Gemini AI sinh rubrics chi tiết từ text hoặc PDF binary
     // ─────────────────────────────────────────────────────────────────────────
+    // ─────────────────────────────────────────────────────────────────────────
+    // Bước 2: Gọi Gemini AI sinh rubrics chi tiết từ text hoặc PDF binary
+    // ─────────────────────────────────────────────────────────────────────────
     private List<RubricDto> callGeminiForRubrics(Lesson lesson, String textContent, byte[] pdfBytes) throws Exception {
-        StringBuilder promptBuilder = new StringBuilder();
-        promptBuilder.append(
-                "Bạn là chuyên gia khảo thí và sư phạm xây dựng thang điểm (rubric) cho bài tập/đề thi THPT.\n\n");
-        promptBuilder.append("## THÔNG TIN BÀI HỌC\n");
-        promptBuilder.append("Tên bài: ").append(lesson.getTitle() != null ? lesson.getTitle() : "Bài tập tự luận")
-                .append("\n\n");
+        String lessonTitle = (lesson.getTitle() != null && !lesson.getTitle().isBlank())
+                ? lesson.getTitle()
+                : "Bài tập tự luận";
 
+        String solutionSection;
         if (textContent != null && !textContent.isBlank()) {
-            promptBuilder.append("## NỘI DUNG ĐÁP ÁN / HƯỚNG DẪN GIẢI\n");
-            promptBuilder.append(textContent).append("\n\n");
+            solutionSection = """
+                    ## NỘI DUNG ĐÁP ÁN / HƯỚNG DẪN GIẢI:
+                    %s
+                    """.formatted(textContent);
         } else {
-            promptBuilder.append("## NỘI DUNG ĐÁP ÁN: Vui lòng đọc trực tiếp từ tài liệu PDF/ảnh đính kèm.\n\n");
+            solutionSection = """
+                    ## NỘI DUNG ĐÁP ÁN:
+                    Vui lòng đọc và phân tích trực tiếp từ tài liệu PDF / hình ảnh barem đính kèm.
+                    """;
         }
 
-        promptBuilder.append("## NHIỆM VỤ QUAN TRỌNG\n")
-                .append("1. Phân tích cấu trúc: Xác định bài thi gồm bao nhiêu Câu/Bài riêng biệt (ví dụ: 'Câu 1', 'Câu 2', 'Câu 3'... hoặc 'Bài 1', 'Bài 2'...). NẾU bài thi có nhiều câu, TUYỆT ĐỐI PHẢI tách thành từng câu tương ứng.\n")
-                .append("2. Phân chia bước giải: Với MỖI Câu/Bài, chia quá trình giải thành các BƯỚC LOGIC CỤ THỂ (thường 2 - 4 bước mỗi câu, ví dụ: Bước 1: Điều kiện & thiết lập phương trình, Bước 2: Biến đổi trung gian, Bước 3: Tính nghiệm và kết luận).\n")
-                .append("3. Mô tả tiêu chí: Mỗi bước phải mô tả RÕ RÀNG học sinh cần làm gì để đạt điểm (không ghi chung chung như 'làm đúng').\n")
-                .append("4. Phân bổ điểm: Điểm của từng bước (maxScore) phải hợp lý. TỔNG ĐIỂM TẤT CẢ CÁC BƯỚC CỦA TOÀN BÀI PHẢI BẰNG ĐÚNG 10.0 ĐIỂM.\n")
-                .append("5. Từ khóa kỹ thuật (expectedLogicKeyword): Liệt kê 1-3 từ khóa/công thức/kết quả cần tìm thấy trong bước đó.\n\n")
-                .append("## ĐỊNH DẠNG ĐẦU RA BẮT BUỘC:\n")
-                .append("Chỉ trả về JSON Array thuần túy, KHÔNG bọc trong markdown ```json, KHÔNG có bất kỳ văn bản giải thích nào khác:\n")
-                .append("[\n")
-                .append("  {\"questionNo\": \"Câu 1\", \"stepOrder\": 1, \"stepDescription\": \"<mô tả tiêu chí bước 1>\", \"maxScore\": 1.5, \"expectedLogicKeyword\": \"<từ khóa>\"},\n")
-                .append("  {\"questionNo\": \"Câu 1\", \"stepOrder\": 2, \"stepDescription\": \"<mô tả tiêu chí bước 2>\", \"maxScore\": 1.5, \"expectedLogicKeyword\": \"<từ khóa>\"}\n")
-                .append("]");
+        String prompt = """
+                ## NHIỆM VỤ THIẾT YẾU
+                Bạn là một Hệ thống Trích xuất Barem Chấm thi Tự động chuyên nghiệp. Hãy phân tích tài liệu Đáp án / Hướng dẫn giải của bài học: "%s" và chuyển đổi thành danh sách các "Milestone Chấm Điểm" chuẩn xác.
+
+                %s
+
+                ## NGUYÊN TẮC XỬ LÝ CHẶT CHẼ
+                1. **Bảo toàn cấu trúc & Số lượng bước (Strict 1-1 Mapping):**
+                   - NẾU Barem đã chia sẵn bước/ý (ví dụ: Bước 1, Bước 2,... hoặc a, b, c): BẮT BUỘC trích xuất ĐẦY ĐỦ 1-1 từng bước đó. TUYỆT ĐỐI KHÔNG gộp bước, rút gọn hay bỏ sót.
+                   - NẾU Barem là văn bản liền mạch: Tự động phân rã thành các bước giải logic rõ ràng theo nguyên tắc: 1 bước = 1 ý tính điểm.
+                   - NẾU tài liệu scan có nét mờ / chữ xấu: Hãy suy luận theo mạch toán học chuẩn để hoàn thiện bước giải đầy đủ.
+
+                2. **Thang điểm trung thực & Ràng buộc Tổng điểm (Score Integrity):**
+                   - NẾU Barem ghi rõ điểm từng bước (vd: 0.25, 0.5, 0.75...): BẮT BUỘC lấy CHÍNH XÁC số điểm đó vào `maxScore`. TUYỆT ĐỐI KHÔNG chia đều điểm.
+                   - NẾU Barem không ghi điểm từng bước: Tự phân bổ điểm hợp lý theo độ khó/khối lượng kiến thức của từng bước.
+                   - **ĐIỀU KIỆN RÀNG BUỘC:** Tổng `maxScore` của toàn bộ các `stepOrder` trong cùng một `questionNo` BẮT BUỘC phải BẰNG TỔNG ĐIỂM của câu hỏi đó trong đề/đáp án gốc, và tổng toàn bài bằng 10.0.
+
+                3. **Mô tả tiêu chí (`stepDescription`):** 
+                   - Viết ngắn gọn, rõ ràng những gì học sinh CẦN ĐẠT ĐƯỢC để lấy điểm bước này.
+
+                4. **Từ khóa & Kết quả chốt (`expectedLogicKeyword`):**
+                   - Liệt kê 1-3 từ khóa kỹ thuật, công thức, biến đổi logic hoặc kết quả số học chốt (ví dụ: "x >= 1", "x = 3", "tam giác vuông tại A").
+
+                ## VÍ DỤ MẪU BAREM CHUẨN (FEW-SHOT):
+                [
+                  {"questionNo": "Câu 1", "stepOrder": 1, "stepDescription": "Đặt điều kiện xác định x >= 1", "maxScore": 0.5, "expectedLogicKeyword": "x >= 1"},
+                  {"questionNo": "Câu 1", "stepOrder": 2, "stepDescription": "Biến đổi phương trình về dạng x^2 - 4x + 3 = 0 và giải ra nghiệm", "maxScore": 1.0, "expectedLogicKeyword": "x^2 - 4x + 3 = 0"},
+                  {"questionNo": "Câu 1", "stepOrder": 3, "stepDescription": "Đối chiếu điều kiện và kết luận tập nghiệm S = {3}", "maxScore": 0.5, "expectedLogicKeyword": "S = {3}, loại x = 1"},
+                  {"questionNo": "Câu 2", "stepOrder": 1, "stepDescription": "Vẽ hình đúng và chứng minh tam giác ABC vuông tại A", "maxScore": 2.0, "expectedLogicKeyword": "tam giác ABC vuông tại A"}
+                ]
+
+                ## YÊU CẦU ĐỊNH DẠNG ĐẦU RA (STRICT OUTPUT)
+                - Chỉ trả về duy nhất 1 chuỗi JSON Array hợp lệ.
+                - KHÔNG bọc trong thẻ ```json ``` hoặc bất kỳ thẻ markdown nào khác.
+                - KHÔNG chèn thêm bất kỳ lời chào, văn bản giải thích hay phản hồi nào ngoài JSON Array.
+                """.formatted(lessonTitle, solutionSection);
 
         String rawResponse;
         if (pdfBytes != null && pdfBytes.length > 0) {
-            rawResponse = geminiService.callGeminiWithMedia(promptBuilder.toString(), pdfBytes, "application/pdf");
+            rawResponse = geminiService.callGeminiWithMedia(prompt, pdfBytes, "application/pdf");
         } else {
-            rawResponse = geminiService.callGemini(promptBuilder.toString());
+            rawResponse = geminiService.callGemini(prompt);
         }
 
         JsonNode root = objectMapper.readTree(rawResponse);
@@ -217,25 +247,34 @@ public class RubricExtractionService {
         List<RubricDto> dtos = objectMapper.readValue(coreJson, new TypeReference<>() {
         });
 
-        double total = dtos.stream().mapToDouble(d -> d.getMaxScore() != null ? d.getMaxScore() : 0).sum();
-        if (dtos.isEmpty() || total <= 0) {
-            throw new RuntimeException("Gemini returned invalid rubric data (empty or zero total score)");
+        if (dtos == null || dtos.isEmpty()) {
+            throw new RuntimeException("Gemini returned empty rubric list");
         }
 
-        // Normalize: đảm bảo tổng điểm chính xác = 10.0
+        // Lọc và làm sạch điểm số âm / null
+        for (RubricDto dto : dtos) {
+            if (dto.getMaxScore() == null || dto.getMaxScore() <= 0) {
+                dto.setMaxScore(0.5);
+            }
+        }
+
+        double total = dtos.stream().mapToDouble(RubricDto::getMaxScore).sum();
+        if (total <= 0) {
+            throw new RuntimeException("Total rubric score is invalid (<= 0)");
+        }
+
+        // Normalize: Đảm bảo tổng điểm bài thi luôn bằng chính xác 10.0
         if (Math.abs(total - 10.0) > 0.01) {
             log.warn("Rubric total score is {} (expected 10.0) for lesson {}. Normalizing...", total, lesson.getId());
             final double factor = 10.0 / total;
-            dtos.forEach(d -> {
-                if (d.getMaxScore() != null) {
-                    // Làm tròn 2 chữ số thập phân
-                    d.setMaxScore(Math.round(d.getMaxScore() * factor * 100.0) / 100.0);
-                }
-            });
+            for (RubricDto d : dtos) {
+                double scaled = Math.round(d.getMaxScore() * factor * 100.0) / 100.0;
+                d.setMaxScore(Math.max(0.1, scaled));
+            }
         }
 
-        log.info("Successfully generated {} rubric steps for lesson {} (normalized total = 10.0)", dtos.size(),
-                lesson.getId());
+        log.info("Successfully generated {} rubric steps for lesson {} (total score: {})",
+                dtos.size(), lesson.getId(), dtos.stream().mapToDouble(RubricDto::getMaxScore).sum());
         return dtos;
     }
 
@@ -244,7 +283,6 @@ public class RubricExtractionService {
     // ─────────────────────────────────────────────────────────────────────────
     private List<Rubric> saveRubrics(Lesson lesson, List<RubricDto> dtos) {
         // Xóa SubmissionDetail liên kết với rubric cũ trước (tránh FK violation)
-        // Dùng deleteByRubricId() thay vì findAll() để tránh load toàn bộ bảng vào RAM
         try {
             List<Rubric> oldRubrics = rubricRepository.findByLessonId(lesson.getId());
             for (Rubric oldR : oldRubrics) {
@@ -305,6 +343,7 @@ public class RubricExtractionService {
             return "[]";
         text = text.trim();
 
+        // 1. Loại bỏ các khối markdown wrapper (```json ... ``` hoặc ``` ...)
         if (text.startsWith("```json"))
             text = text.substring(7);
         else if (text.startsWith("```"))
@@ -313,10 +352,13 @@ public class RubricExtractionService {
             text = text.substring(0, text.length() - 3);
         text = text.trim();
 
+        // 2. Tìm cặp ngoặc mảng JSON [...] ngoài cùng
         int start = text.indexOf('[');
         int end = text.lastIndexOf(']');
         if (start != -1 && end != -1 && end > start) {
-            String candidate = text.substring(start, end + 1);
+            String candidate = text.substring(start, end + 1).trim();
+            // Loại bỏ dấu phẩy thừa trước ngoặc đóng (trailing comma) nếu có
+            candidate = candidate.replaceAll(",\\s*\\]", "]");
             try {
                 objectMapper.readTree(candidate);
                 return candidate;
@@ -324,7 +366,7 @@ public class RubricExtractionService {
             }
         }
 
-        // Fallback: Regex trích xuất tất cả các đối tượng JSON {...} hoàn chỉnh hợp lệ
+        // 3. Fallback: Regex trích xuất tất cả các đối tượng JSON {...} hoàn chỉnh hợp lệ
         java.util.regex.Pattern pattern = java.util.regex.Pattern.compile("\\{[^{}]*\\}");
         java.util.regex.Matcher matcher = pattern.matcher(text);
         List<String> validObjects = new ArrayList<>();

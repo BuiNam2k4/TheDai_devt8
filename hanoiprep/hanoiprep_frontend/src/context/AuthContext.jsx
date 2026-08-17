@@ -25,8 +25,8 @@ export const AuthProvider = ({ children }) => {
     setCurrentUser(undefined);
   };
 
-  const register = (username, password, role) => {
-    return AuthService.register(username, password, role);
+  const register = (username, gmail, password, role) => {
+    return AuthService.register(username, gmail, password, role);
   };
 
   return (

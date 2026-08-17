@@ -8,6 +8,8 @@ services:
     ports:
       - "5672:5672"
       - "15672:15672"
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
     networks:
       - hanoiprep-net
 
@@ -17,6 +19,8 @@ services:
     container_name: hanoiprep_backend
     ports:
       - "8080:8080"
+    env_file:
+      - ./hanoiprep_backend/.env
     environment:
       - SPRING_RABBITMQ_HOST=rabbitmq
     depends_on:
@@ -24,7 +28,7 @@ services:
     networks:
       - hanoiprep-net
 
-  # 3. Frontend React (Vite)
+  # 3. Frontend React (Vite + Nginx)
   frontend:
     build: ./hanoiprep_frontend
     container_name: hanoiprep_frontend
@@ -34,6 +38,9 @@ services:
       - backend
     networks:
       - hanoiprep-net
+
+volumes:
+  rabbitmq_data:
 
 networks:
   hanoiprep-net:

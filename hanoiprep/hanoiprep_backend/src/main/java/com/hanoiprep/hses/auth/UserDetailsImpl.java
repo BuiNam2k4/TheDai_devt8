@@ -13,14 +13,16 @@ public class UserDetailsImpl implements UserDetails {
 
     private Long id;
     private String username;
+    private String gmail;
     private String password;
     private boolean isActive;
     private Collection<? extends GrantedAuthority> authorities;
 
-    public UserDetailsImpl(Long id, String username, String password, boolean isActive,
+    public UserDetailsImpl(Long id, String username, String gmail, String password, boolean isActive,
             Collection<? extends GrantedAuthority> authorities) {
         this.id = id;
         this.username = username;
+        this.gmail = gmail;
         this.password = password;
         this.isActive = isActive;
         this.authorities = authorities;
@@ -31,6 +33,7 @@ public class UserDetailsImpl implements UserDetails {
         return new UserDetailsImpl(
                 user.getId(),
                 user.getUsername(),
+                user.getGmail(),
                 user.getPassword(),
                 user.isActive(),
                 authorities);
@@ -38,6 +41,10 @@ public class UserDetailsImpl implements UserDetails {
 
     public Long getId() {
         return id;
+    }
+
+    public String getGmail() {
+        return gmail;
     }
 
     @Override

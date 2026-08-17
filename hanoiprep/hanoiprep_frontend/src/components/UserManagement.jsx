@@ -10,8 +10,11 @@ const UserManagement = () => {
   
   // Modal & Form State
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [editUserId, setEditUserId] = useState(null);
   const [formData, setFormData] = useState({
     username: "",
+    gmail: "",
     password: "",
     role: "ROLE_LEARNER",
   });
@@ -72,9 +75,12 @@ const UserManagement = () => {
     }
   };
 
-  const handleOpenModal = () => {
+  const handleOpenCreateModal = () => {
+    setIsEditMode(false);
+    setEditUserId(null);
     setFormData({
       username: "",
+      gmail: "",
       password: "",
       role: "ROLE_LEARNER",
     });
@@ -82,8 +88,23 @@ const UserManagement = () => {
     setIsModalOpen(true);
   };
 
+  const handleOpenEditModal = (user) => {
+    setIsEditMode(true);
+    setEditUserId(user.id);
+    setFormData({
+      username: user.username || "",
+      gmail: user.gmail || "",
+      password: "",
+      role: user.role || "ROLE_LEARNER",
+    });
+    setModalError("");
+    setIsModalOpen(true);
+  };
+
   const handleCloseModal = () => {
     setIsModalOpen(false);
+    setIsEditMode(false);
+    setEditUserId(null);
     setModalError("");
   };
 
@@ -95,7 +116,7 @@ const UserManagement = () => {
     }));
   };
 
-  const handleCreateUser = async (e) => {
+  const handleSaveUser = async (e) => {
     e.preventDefault();
     setModalError("");
 
@@ -104,20 +125,41 @@ const UserManagement = () => {
       return;
     }
 
-    if (!formData.password || formData.password.length < 6) {
+    if (!formData.gmail || !formData.gmail.trim()) {
+      setModalError("Gmail is required and cannot be empty.");
+      return;
+    }
+
+    if (!isEditMode && (!formData.password || formData.password.length < 6)) {
       setModalError("Password must be at least 6 characters long.");
+      return;
+    }
+
+    if (isEditMode && formData.password && formData.password.length < 6) {
+      setModalError("New password must be at least 6 characters long.");
       return;
     }
 
     setIsSubmitting(true);
     try {
-      await UserService.createUser({
-        username: formData.username.trim(),
-        password: formData.password,
-        role: formData.role,
-      });
+      if (isEditMode) {
+        await UserService.updateUser(editUserId, {
+          username: formData.username.trim(),
+          gmail: formData.gmail.trim(),
+          password: formData.password ? formData.password : undefined,
+          role: formData.role,
+        });
+        setSuccessMessage("User updated successfully!");
+      } else {
+        await UserService.createUser({
+          username: formData.username.trim(),
+          gmail: formData.gmail ? formData.gmail.trim() : null,
+          password: formData.password,
+          role: formData.role,
+        });
+        setSuccessMessage("User created successfully!");
+      }
 
-      setSuccessMessage("User created successfully!");
       setIsModalOpen(false);
       fetchUsers();
       setTimeout(() => setSuccessMessage(""), 4000);
@@ -127,7 +169,7 @@ const UserManagement = () => {
           error.response.data &&
           error.response.data.message) ||
         error.message ||
-        "Failed to create user.";
+        (isEditMode ? "Failed to update user." : "Failed to create user.");
       setModalError(resMessage);
     } finally {
       setIsSubmitting(false);
@@ -139,7 +181,7 @@ const UserManagement = () => {
       <div className="admin-card">
         <div className="admin-header">
           <h2 className="admin-title">User Management</h2>
-          <button className="btn-add-user" onClick={handleOpenModal}>
+          <button className="btn-add-user" onClick={handleOpenCreateModal}>
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
               <line x1="12" y1="5" x2="12" y2="19"></line>
               <line x1="5" y1="12" x2="19" y2="12"></line>
@@ -157,6 +199,7 @@ const UserManagement = () => {
               <tr>
                 <th>ID</th>
                 <th>Username</th>
+                <th>Gmail</th>
                 <th>Role</th>
                 <th>Status</th>
                 <th>Actions</th>
@@ -167,6 +210,7 @@ const UserManagement = () => {
                 <tr key={user.id}>
                   <td>{user.id}</td>
                   <td>{user.username}</td>
+                  <td>{user.gmail || <span style={{ color: 'var(--text-muted)', fontStyle: 'italic' }}>N/A</span>}</td>
                   <td>
                     <span className={`badge ${user.role}`}>
                       {user.role === 'ROLE_ADMIN' ? 'Admin' :
@@ -179,30 +223,40 @@ const UserManagement = () => {
                     </span>
                   </td>
                   <td>
-                    {user.role === 'ROLE_ADMIN' ? (
-                      <span style={{ color: 'var(--text-muted)', fontStyle: 'italic' }}>Active</span>
-                    ) : user.active ? (
+                    <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
                       <button
-                        className="btn-delete"
-                        onClick={() => handleDeactivate(user.id)}
+                        className="btn btn-secondary"
+                        style={{ padding: '0.35rem 0.75rem', fontSize: '0.85rem' }}
+                        onClick={() => handleOpenEditModal(user)}
                       >
-                        Deactivate
+                        Edit
                       </button>
-                    ) : (
-                      <button
-                        className="btn btn-primary"
-                        style={{ padding: '0.4rem 0.8rem', fontSize: '0.85rem' }}
-                        onClick={() => handleActivate(user.id)}
-                      >
-                        Activate
-                      </button>
-                    )}
+                      {user.role === 'ROLE_ADMIN' ? (
+                        <span style={{ color: 'var(--text-muted)', fontStyle: 'italic', marginLeft: '0.5rem' }}>Protected</span>
+                      ) : user.active ? (
+                        <button
+                          className="btn-delete"
+                          style={{ padding: '0.35rem 0.75rem', fontSize: '0.85rem' }}
+                          onClick={() => handleDeactivate(user.id)}
+                        >
+                          Deactivate
+                        </button>
+                      ) : (
+                        <button
+                          className="btn btn-primary"
+                          style={{ padding: '0.35rem 0.75rem', fontSize: '0.85rem' }}
+                          onClick={() => handleActivate(user.id)}
+                        >
+                          Activate
+                        </button>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))}
               {users.length === 0 && (
                 <tr>
-                  <td colSpan="5" className="text-center">No users found.</td>
+                  <td colSpan="6" className="text-center">No users found.</td>
                 </tr>
               )}
             </tbody>
@@ -210,17 +264,17 @@ const UserManagement = () => {
         </div>
       </div>
 
-      {/* Add User Modal */}
+      {/* Add / Edit User Modal */}
       {isModalOpen && (
         <div className="modal-overlay" onClick={handleCloseModal}>
           <div className="modal-card" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
-              <h3>Add New User</h3>
+              <h3>{isEditMode ? `Edit User #${editUserId}` : "Add New User"}</h3>
               <button className="modal-close-btn" onClick={handleCloseModal}>
                 &times;
               </button>
             </div>
-            <form onSubmit={handleCreateUser}>
+            <form onSubmit={handleSaveUser}>
               <div className="modal-body">
                 {modalError && <div className="alert alert-danger" style={{ marginTop: 0, marginBottom: '1rem' }}>{modalError}</div>}
 
@@ -240,16 +294,32 @@ const UserManagement = () => {
                 </div>
 
                 <div className="form-group">
-                  <label htmlFor="password">Password</label>
+                  <label htmlFor="gmail">Gmail / Email</label>
+                  <input
+                    type="email"
+                    id="gmail"
+                    name="gmail"
+                    className="form-control"
+                    placeholder="Enter Gmail address (e.g. user@gmail.com)"
+                    value={formData.gmail}
+                    onChange={handleInputChange}
+                    required
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label htmlFor="password">
+                    {isEditMode ? "New Password (optional)" : "Password"}
+                  </label>
                   <input
                     type="password"
                     id="password"
                     name="password"
                     className="form-control"
-                    placeholder="Enter password (min 6 characters)"
+                    placeholder={isEditMode ? "Leave blank to keep current password" : "Enter password (min 6 characters)"}
                     value={formData.password}
                     onChange={handleInputChange}
-                    required
+                    required={!isEditMode}
                   />
                 </div>
 
@@ -288,10 +358,10 @@ const UserManagement = () => {
                   {isSubmitting ? (
                     <>
                       <div className="spinner" style={{ width: '1rem', height: '1rem' }}></div>
-                      <span>Creating...</span>
+                      <span>Saving...</span>
                     </>
                   ) : (
-                    "Create User"
+                    isEditMode ? "Update User" : "Create User"
                   )}
                 </button>
               </div>

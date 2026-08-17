@@ -53,6 +53,7 @@ public class AuthController {
                 jwt,
                 userDetails.getId(),
                 userDetails.getUsername(),
+                userDetails.getGmail(),
                 role));
     }
 
@@ -64,12 +65,25 @@ public class AuthController {
                     .body(new MessageResponse("Error: Username is already taken!"));
         }
 
+        if (signUpRequest.getGmail() == null || signUpRequest.getGmail().trim().isBlank()) {
+            return ResponseEntity
+                    .badRequest()
+                    .body(new MessageResponse("Error: Gmail is required!"));
+        }
+
+        if (userRepository.existsByGmail(signUpRequest.getGmail().trim())) {
+            return ResponseEntity
+                    .badRequest()
+                    .body(new MessageResponse("Error: Gmail is already in use!"));
+        }
+
         String reqRole = signUpRequest.getRole();
         String role = (reqRole != null && !reqRole.isEmpty()) ? reqRole : "ROLE_LEARNER";
 
         // Create new user's account
         User user = User.builder()
-                .username(signUpRequest.getUsername())
+                .username(signUpRequest.getUsername().trim())
+                .gmail(signUpRequest.getGmail().trim())
                 .password(encoder.encode(signUpRequest.getPassword()))
                 .role(role)
                 .build();
