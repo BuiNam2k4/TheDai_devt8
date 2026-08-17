@@ -4,6 +4,7 @@ import { AuthContext } from "../context/AuthContext";
 
 const Signup = () => {
   const [username, setUsername] = useState("");
+  const [gmail, setGmail] = useState("");
   const [password, setPassword] = useState("");
   const [role, setRole] = useState("ROLE_LEARNER");
   const [successful, setSuccessful] = useState(false);
@@ -18,31 +19,43 @@ const Signup = () => {
     setSuccessful(false);
     setLoading(true);
 
-    if (username.length >= 3 && password.length >= 6) {
-      register(username, password, role).then(
-        (response) => {
-          setLoading(false);
-          setMessage(response.data.message || "Registration successful!");
-          setSuccessful(true);
-        },
-        (error) => {
-          setLoading(false);
-          const resMessage =
-            (error.response &&
-              error.response.data &&
-              error.response.data.message) ||
-            error.message ||
-            error.toString();
-
-          setMessage(resMessage);
-          setSuccessful(false);
-        }
-      );
-    } else {
+    if (!username.trim() || username.trim().length < 3) {
       setLoading(false);
-      setMessage("Username must be at least 3 characters and password at least 6 characters.");
-      setSuccessful(false);
+      setMessage("Username must be at least 3 characters.");
+      return;
     }
+
+    if (!gmail.trim()) {
+      setLoading(false);
+      setMessage("Gmail is required and cannot be empty.");
+      return;
+    }
+
+    if (!password || password.length < 6) {
+      setLoading(false);
+      setMessage("Password must be at least 6 characters.");
+      return;
+    }
+
+    register(username.trim(), gmail.trim(), password, role).then(
+      (response) => {
+        setLoading(false);
+        setMessage(response.data.message || "Registration successful!");
+        setSuccessful(true);
+      },
+      (error) => {
+        setLoading(false);
+        const resMessage =
+          (error.response &&
+            error.response.data &&
+            error.response.data.message) ||
+          error.message ||
+          error.toString();
+
+        setMessage(resMessage);
+        setSuccessful(false);
+      }
+    );
   };
 
   return (
@@ -63,6 +76,20 @@ const Signup = () => {
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
                   placeholder="Choose a username"
+                  required
+                />
+              </div>
+
+              <div className="form-group">
+                <label htmlFor="gmail">Gmail / Email</label>
+                <input
+                  type="email"
+                  className="form-control"
+                  name="gmail"
+                  value={gmail}
+                  onChange={(e) => setGmail(e.target.value)}
+                  placeholder="Enter your Gmail address"
+                  required
                 />
               </div>
 
@@ -75,6 +102,7 @@ const Signup = () => {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="Create a password"
+                  required
                 />
               </div>
 
