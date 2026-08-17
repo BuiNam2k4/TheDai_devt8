@@ -17,10 +17,28 @@ public class RubricController {
     @Autowired
     private LessonRepository lessonRepository;
 
-    /** Lấy danh sách rubric của 1 lesson */
+    @Autowired
+    private RubricExtractionService rubricExtractionService;
+
+    /** Lấy danh sách rubric của 1 lesson theo thứ tự câu và bước */
     @GetMapping("/api/lessons/{lessonId}/rubrics")
     public ResponseEntity<?> getRubricsByLesson(@PathVariable Long lessonId) {
-        return ResponseEntity.ok(rubricRepository.findByLessonId(lessonId));
+        return ResponseEntity.ok(rubricRepository.findByLessonIdOrderByQuestionNoAscStepOrderAsc(lessonId));
+    }
+
+    /** Tự động trích xuất lại Rubrics từ file đáp án của lesson bằng AI */
+    @PostMapping("/api/lessons/{lessonId}/re-extract-rubrics")
+    public ResponseEntity<?> reExtractRubrics(@PathVariable Long lessonId) {
+        Lesson lesson = lessonRepository.findById(lessonId).orElse(null);
+        if (lesson == null) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Lesson not found"));
+        }
+        var rubrics = rubricExtractionService.extractAndSaveRubricsFromLessonEntity(lesson);
+        return ResponseEntity.ok(Map.of(
+                "message", "Rubrics extracted successfully",
+                "rubricCount", rubrics.size(),
+                "rubrics", rubrics
+        ));
     }
 
     /** Tạo 1 rubric step cho lesson */

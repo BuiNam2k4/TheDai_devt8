@@ -13,9 +13,12 @@ import com.hanoiprep.hses.submission.SubmissionDetailRepository;
 import com.hanoiprep.hses.submission.SubmissionRepository;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -23,6 +26,8 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 public class AIGradingService {
+
+    private static final Logger log = LoggerFactory.getLogger(AIGradingService.class);
 
     private final SubmissionRepository submissionRepository;
     private final SubmissionDetailRepository submissionDetailRepository;
@@ -42,15 +47,25 @@ public class AIGradingService {
     @Transactional
     public void gradeSubmission(Long submissionId) throws Exception {
         Submission submission = submissionRepository.findById(submissionId)
-                .orElseThrow(() -> new RuntimeException("Submission not found"));
+                .orElseThrow(() -> new RuntimeException("Submission not found: " + submissionId));
 
-        // 1. Tối ưu: Lấy rubrics có sẵn trong DB theo lessonId
-        List<Rubric> rubrics = rubricRepository.findByLessonId(submission.getLesson().getId());
+        // 1. Lấy rubrics theo đúng thứ tự: questionNo ASC, stepOrder ASC
+        List<Rubric> rubrics = rubricRepository.findByLessonIdOrderByQuestionNoAscStepOrderAsc(submission.getLesson().getId());
 
-        // 2. Nếu bài học chưa từng có rubric, mới gọi AI để sinh và lưu vào DB lần đầu
-        if (rubrics == null || rubrics.isEmpty()) {
-            rubrics = rubricExtractionService.extractAndSaveRubricsFromLessonEntity(submission.getLesson());
+        // 2. Nếu bài học chưa có rubric hoặc chỉ có 1 rubric tạm tổng quát, tự động trích xuất chi tiết từ file đáp án
+        boolean isPlaceholderOnly = rubrics != null && rubrics.size() == 1
+                && (rubrics.get(0).getStepDescription() == null
+                || rubrics.get(0).getStepDescription().contains("Đánh giá tổng thể"));
+
+        if (rubrics == null || rubrics.isEmpty() || isPlaceholderOnly) {
+            log.info("Rubrics not found or only placeholder exists for lesson {}. Extracting detailed rubrics from solution...", submission.getLesson().getId());
+            List<Rubric> extracted = rubricExtractionService.extractAndSaveRubricsFromLessonEntity(submission.getLesson());
+            if (extracted != null && !extracted.isEmpty()) {
+                rubrics = extracted;
+            }
         }
+
+        log.info("Grading submission {} with {} rubric steps", submissionId, rubrics.size());
 
         // 3. Chấm điểm chi tiết theo các tiêu chí rubric
         gradeWithRubrics(submission, rubrics);
@@ -58,33 +73,60 @@ public class AIGradingService {
 
     // ─────────────────────────────────────────────────────────────────────────
     // Chấm theo barem Rubric (đã được trích xuất từ file đáp án)
+    // Mục tiêu: với mỗi tiêu chí rubric, AI đánh giá bài làm học sinh có
+    // đáp ứng ĐÚNG yêu cầu của bước đó không, cho điểm tương ứng.
     // ─────────────────────────────────────────────────────────────────────────
     private void gradeWithRubrics(Submission submission, List<Rubric> rubrics) throws Exception {
-        String rubricContext = rubrics.stream()
-                .map(r -> String.format("ID: %d | Bước: %d | Yêu cầu: %s | Điểm tối đa: %.2f",
-                        r.getId(), r.getStepOrder(), r.getStepDescription(), r.getMaxScore()))
-                .collect(Collectors.joining("\n"));
-
         double totalMaxScore = rubrics.stream().mapToDouble(Rubric::getMaxScore).sum();
+        String studentAnswer = submission.getAnswerText() != null && !submission.getAnswerText().isBlank()
+                ? submission.getAnswerText()
+                : "Học sinh không nhập câu trả lời hoặc bài nộp trống.";
 
-        String prompt = "Bạn là giáo viên chấm thi chuyên nghiệp.\n" +
-                "Dưới đây là barem chi tiết (phân theo từng Bài/Câu) và bài làm của học sinh.\n\n" +
-                "BAREM CHẤM ĐIỂM:\n" + rubricContext + "\n\n" +
-                "BÀI LÀM CỦA HỌC SINH:\n"
-                + (submission.getAnswerText() != null ? submission.getAnswerText() : "Học sinh không nhập câu trả lời.")
-                + "\n\n" +
-                "QUY TẮC CHẤM THI NGHIÊM NGẶT:\n" +
-                "1. Chấm điểm lần lượt từng bước trong từng Bài/Câu.\n" +
-                "2. NẾU HỌC SINH LÀM SAI HOẶC THIẾU Ở BẤT KỲ BƯỚC NÀO TRONG MỘT CÂU, THÌ TẤT CẢ CÁC BƯỚC ĐẰNG SAU CỦA CÂU ĐÓ PHẢI CHO 0 ĐIỂM (awardedScore = 0.0) vì kết quả các bước sau của câu đó đã bị sai theo.\n"
-                +
-                "3. MỖI BÀI/CÂU ĐƯỢC CHẤM ĐỘC LẬP: Lỗi sai ở Câu a KHÔNG làm ảnh hưởng đến điểm của Câu b hay các câu khác.\n"
-                +
-                "4. Đối với các bước đằng sau bị 0 điểm do bước trước sai, phần aiFeedback ghi rõ: 'Không được tính điểm do bước trước đó trong câu này đã bị làm sai hoặc thiếu.'\n\n"
-                +
-                "Chỉ trả về một mảng JSON nguyên chất, KHÔNG có markdown:\n" +
-                "[{\"rubricId\": <ID_số_nguyên>, \"awardedScore\": <điểm_số_thực>, \"aiFeedback\": \"<nhận xét chi tiết>\"}]\n"
-                +
-                "Điểm tối đa của mỗi tiêu chí không được vượt quá barem. Tổng điểm tối đa là " + totalMaxScore + ".";
+        // ── Kỹ thuật "Per-criterion forced evaluation" ──
+        // Thay vì liệt kê barem rồi nhờ AI tự suy, ta mô tả TỪNG tiêu chí như
+        // một câu hỏi độc lập: "Tìm bằng chứng trong bài → kết luận → cho điểm"
+        // Cách này buộc AI đọc bài làm nhiều lần (1 lần / tiêu chí), không tổng hợp chung.
+        StringBuilder criteriaBlock = new StringBuilder();
+        for (int idx = 0; idx < rubrics.size(); idx++) {
+            Rubric r = rubrics.get(idx);
+            String kw = (r.getExpectedLogicKeyword() != null && !r.getExpectedLogicKeyword().isBlank())
+                    ? r.getExpectedLogicKeyword() : "(không yêu cầu từ khóa cụ thể)";
+            criteriaBlock.append(String.format(
+                    "TIÊU CHÍ %d — rubricId=%d (%s, Bước %d)\n"
+                    + "  Yêu cầu: %s\n"
+                    + "  Điểm tối đa: %.2f\n"
+                    + "  Từ/cụm từ kỹ thuật cần tìm: %s\n"
+                    + "  → Hãy trích dẫn NGUYÊN VĂN đoạn trong bài làm liên quan đến tiêu chí này (nếu không tìm thấy ghi \"Không tìm thấy\").\n"
+                    + "  → Đánh giá: đúng / sai / đúng một phần → cho điểm từ 0 đến %.2f.\n\n",
+                    idx + 1, r.getId(),
+                    r.getQuestionNo() != null ? r.getQuestionNo() : "Câu 1",
+                    r.getStepOrder(),
+                    r.getStepDescription(),
+                    r.getMaxScore(),
+                    kw,
+                    r.getMaxScore()
+            ));
+        }
+
+        String prompt = "Bạn là giáo viên chấm thi chuyên nghiệp. Hãy chấm điểm BÀI LÀM sau theo từng tiêu chí độc lập.\n\n"
+                + "══════════════════════════════════════\n"
+                + "BÀI LÀM CỦA HỌC SINH\n"
+                + "══════════════════════════════════════\n"
+                + studentAnswer
+                + "\n\n══════════════════════════════════════\n"
+                + "CÁC TIÊU CHÍ CẦN CHẤM (" + rubrics.size() + " tiêu chí, tổng = "
+                + String.format("%.2f", totalMaxScore) + " điểm)\n"
+                + "══════════════════════════════════════\n"
+                + criteriaBlock
+                + "══════════════════════════════════════\n"
+                + "QUAN TRỌNG: Chấm MỖI TIÊU CHÍ HOÀN TOÀN ĐỘC LẬP.\n"
+                + "- KHÔNG chấm theo cảm nhận tổng thể bài làm.\n"
+                + "- KHÔNG cho điểm cao vì bài làm nhìn chung tốt hay điểm thấp vì bài nhìn chung yếu.\n"
+                + "- CHỈ căn cứ vào: tiêu chí đó yêu cầu gì + bài làm có làm đúng yêu cầu đó không.\n"
+                + "- Nếu học sinh làm đúng yêu cầu của tiêu chí → cho điểm tối đa của tiêu chí đó.\n"
+                + "- Nếu không tìm thấy bằng chứng → awardedScore = 0.0.\n\n"
+                + "Trả về ĐÚNG " + rubrics.size() + " phần tử JSON, KHÔNG có markdown:\n"
+                + "[{\"rubricId\": <số_nguyên_từ_rubricId=>, \"awardedScore\": <số_thực_0_đến_maxScore>, \"aiFeedback\": \"<trích_dẫn_và_nhận_xét_ngắn>\"}]";
 
         String rawAiResponse = geminiService.callGemini(prompt);
 
@@ -102,17 +144,22 @@ public class AIGradingService {
         } catch (Exception ignored) {
         }
 
-        List<AIGradingResultDto> results = objectMapper.readValue(coreJson, new TypeReference<>() {
-        });
+        List<AIGradingResultDto> results = objectMapper.readValue(coreJson, new TypeReference<>() {});
+
+        if (results.size() != rubrics.size()) {
+            log.warn("AI returned {} results but expected {} rubric steps for submission {}. Proceeding with best-effort matching.",
+                    results.size(), rubrics.size(), submission.getId());
+        }
 
         double totalScore = 0.0;
         java.util.Set<String> failedQuestionsSet = new java.util.HashSet<>();
+        List<SubmissionDetail> detailsToSave = new ArrayList<>();
 
         for (int i = 0; i < results.size(); i++) {
             AIGradingResultDto result = results.get(i);
             final int index = i;
 
-            // Robust matching: 1. By ID, 2. By stepOrder, 3. By list index
+            // Matching rubricId: 1. By ID (chính xác), 2. By stepOrder, 3. By list index (fallback)
             Rubric matchedRubric = rubrics.stream()
                     .filter(r -> result.getRubricId() != null && r.getId().equals(result.getRubricId()))
                     .findFirst()
@@ -122,38 +169,45 @@ public class AIGradingService {
                             .findFirst()
                             .orElseGet(() -> index < rubrics.size() ? rubrics.get(index) : rubrics.get(0)));
 
-            String qNo = matchedRubric.getQuestionNo() != null ? matchedRubric.getQuestionNo() : "Bài 1";
+            String qNo = matchedRubric.getQuestionNo() != null ? matchedRubric.getQuestionNo() : "Câu 1";
             double rawScore = result.getAwardedScore() != null ? result.getAwardedScore() : 0.0;
             String feedback = result.getAiFeedback() != null ? result.getAiFeedback() : "Đã hoàn thành tiêu chí.";
 
-            double finalScore = 0.0;
+            double finalScore;
 
             if (failedQuestionsSet.contains(qNo)) {
+                // Bước trước trong cùng câu đã sai → bước này = 0 điểm
                 finalScore = 0.0;
                 feedback = "Không được tính điểm do bước trước đó trong " + qNo + " đã bị làm sai hoặc thiếu.";
             } else {
-                finalScore = Math.min(rawScore, matchedRubric.getMaxScore());
-                // Nếu bước này trong câu này không đạt điểm tối đa -> đánh dấu câu qNo này bị
-                // hỏng các bước sau
+                // Đảm bảo điểm không vượt quá trần và làm tròn 2 chữ số
+                finalScore = Math.round(Math.min(rawScore, matchedRubric.getMaxScore()) * 100.0) / 100.0;
+                // Nếu bước này không đạt điểm tối đa → đánh dấu câu này bị hỏng các bước sau
                 if (finalScore < matchedRubric.getMaxScore()) {
                     failedQuestionsSet.add(qNo);
                 }
             }
 
-            SubmissionDetail detail = SubmissionDetail.builder()
+            detailsToSave.add(SubmissionDetail.builder()
                     .submission(submission)
                     .rubric(matchedRubric)
                     .awardedScore(finalScore)
                     .aiFeedback(feedback)
-                    .build();
+                    .build());
 
-            submissionDetailRepository.save(detail);
             totalScore += finalScore;
         }
 
-        submission.setTotalScore(totalScore);
+        // Lưu toàn bộ details bằng saveAll() — 1 batch thay vì N roundtrips
+        submissionDetailRepository.saveAll(detailsToSave);
+
+        // Làm tròn tổng điểm 2 chữ số thập phân
+        submission.setTotalScore(Math.round(totalScore * 100.0) / 100.0);
         submission.setStatus("GRADED");
+        submission.setGradedAt(LocalDateTime.now());
         submissionRepository.save(submission);
+
+        log.info("Submission {} graded successfully. Total score: {}/{}", submission.getId(), submission.getTotalScore(), totalMaxScore);
     }
 
     // ─────────────────────────────────────────────────────────────────────────

@@ -93,10 +93,10 @@ const LessonUpload = () => {
             ) : (
               <>
                 <p style={{ color: '#f59e0b', fontWeight: 600, marginBottom: '0.25rem' }}>
-                  ⚠️ Bài học đã tạo nhưng chưa có tiêu chí chấm điểm
+                  ⚠️ Bài học đã được tạo thành công
                 </p>
                 <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>
-                  AI không thể trích xuất từ file PDF (có thể là PDF scan). Hệ thống sẽ dùng chế độ chấm điểm tự do (10 điểm).
+                  Hệ thống đã thiết lập thang điểm đánh giá tổng thể cho bài học.
                 </p>
               </>
             )}

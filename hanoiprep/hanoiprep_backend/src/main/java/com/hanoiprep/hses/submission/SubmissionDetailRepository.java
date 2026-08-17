@@ -12,4 +12,8 @@ public interface SubmissionDetailRepository extends JpaRepository<SubmissionDeta
 
     @Transactional
     void deleteBySubmissionId(Long submissionId);
+
+    /** Xóa tất cả chi tiết điểm liên kết với một tiêu chí rubric cụ thể (dùng khi xóa rubric cũ) */
+    @Transactional
+    void deleteByRubricId(Long rubricId);
 }

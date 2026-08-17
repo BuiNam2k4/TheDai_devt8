@@ -35,6 +35,7 @@ public class Submission {
     private Double totalScore;
     
     private LocalDateTime createdAt;
+    private LocalDateTime gradedAt;
 
     @com.fasterxml.jackson.annotation.JsonIgnore
     @OneToMany(mappedBy = "submission", cascade = CascadeType.ALL, orphanRemoval = true)
