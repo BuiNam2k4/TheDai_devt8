@@ -135,18 +135,12 @@ const UserManagement = () => {
       return;
     }
 
-    if (isEditMode && formData.password && formData.password.length < 6) {
-      setModalError("New password must be at least 6 characters long.");
-      return;
-    }
-
     setIsSubmitting(true);
     try {
       if (isEditMode) {
         await UserService.updateUser(editUserId, {
           username: formData.username.trim(),
           gmail: formData.gmail.trim(),
-          password: formData.password ? formData.password : undefined,
           role: formData.role,
         });
         setSuccessMessage("User updated successfully!");
@@ -307,21 +301,21 @@ const UserManagement = () => {
                   />
                 </div>
 
-                <div className="form-group">
-                  <label htmlFor="password">
-                    {isEditMode ? "New Password (optional)" : "Password"}
-                  </label>
-                  <input
-                    type="password"
-                    id="password"
-                    name="password"
-                    className="form-control"
-                    placeholder={isEditMode ? "Leave blank to keep current password" : "Enter password (min 6 characters)"}
-                    value={formData.password}
-                    onChange={handleInputChange}
-                    required={!isEditMode}
-                  />
-                </div>
+                {!isEditMode && (
+                  <div className="form-group">
+                    <label htmlFor="password">Password</label>
+                    <input
+                      type="password"
+                      id="password"
+                      name="password"
+                      className="form-control"
+                      placeholder="Enter password (min 6 characters)"
+                      value={formData.password}
+                      onChange={handleInputChange}
+                      required
+                    />
+                  </div>
+                )}
 
                 <div className="form-group" style={{ marginBottom: 0 }}>
                   <label htmlFor="role">Role</label>

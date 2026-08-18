@@ -10,6 +10,7 @@ const LessonView = () => {
   const [availableLessons, setAvailableLessons] = useState([]);
   const [selectedLesson, setSelectedLesson] = useState(null);
   const [submissions, setSubmissions] = useState([]);
+  const [lessonFeedbacks, setLessonFeedbacks] = useState([]);
   const [selectedPdfUrl, setSelectedPdfUrl] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [answerText, setAnswerText] = useState('');
@@ -35,10 +36,17 @@ const LessonView = () => {
     setSelectedLesson(lesson);
     if (currentUser?.role === 'ROLE_COURSE_PROVIDER') {
       try {
-        const res = await axios.get(`http://localhost:8080/api/submissions/lesson/${lesson.id}`, { headers: authHeader() });
-        setSubmissions(res.data);
+        const subRes = await axios.get(`http://localhost:8080/api/submissions/lesson/${lesson.id}`, { headers: authHeader() });
+        setSubmissions(subRes.data);
       } catch (error) {
         console.error("Error fetching submissions", error);
+      }
+
+      try {
+        const fbRes = await axios.get(`http://localhost:8080/api/feedbacks/lesson/${lesson.id}`, { headers: authHeader() });
+        setLessonFeedbacks(fbRes.data || []);
+      } catch (error) {
+        console.error("Error fetching feedbacks", error);
       }
     }
     setSelectedPdfUrl(null);
@@ -231,26 +239,68 @@ const LessonView = () => {
             )}
 
             {currentUser?.role === 'ROLE_COURSE_PROVIDER' && (
-              <div style={{ marginTop: '3rem' }}>
-                <h3 style={{ marginBottom: '1rem', color: 'var(--primary-color)' }}>Student Submissions</h3>
-                {submissions.length > 0 ? (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                    {submissions.map(sub => (
-                      <div key={sub.id} style={{ background: 'var(--input-bg)', padding: '1rem', borderRadius: '0.5rem', border: '1px solid var(--border-color)' }}>
-                        <p><strong>User ID:</strong> {sub.user?.username || sub.user?.id || 'Unknown'}</p>
-                        <p><strong>Submitted At:</strong> {new Date(sub.createdAt).toLocaleString()}</p>
-                        {sub.answerFileUrl && (
-                          <button onClick={() => handleDownload(sub.answerFileUrl, `Submission_${sub.id}`)} style={{ marginTop: '0.5rem', background: 'var(--primary-color)', color: 'white', border: 'none', padding: '0.5rem 1rem', borderRadius: '0.25rem', cursor: 'pointer' }}>
-                            Download File
-                          </button>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p style={{ color: 'var(--text-muted)' }}>No submissions yet.</p>
-                )}
-              </div>
+              <>
+                <div style={{ marginTop: '2.5rem' }}>
+                  <h3 style={{ marginBottom: '1rem', color: 'var(--primary-color)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    📥 Student Submissions ({submissions.length})
+                  </h3>
+                  {submissions.length > 0 ? (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                      {submissions.map(sub => (
+                        <div key={sub.id} style={{ background: 'var(--input-bg)', padding: '1rem', borderRadius: '0.5rem', border: '1px solid var(--border-color)' }}>
+                          <p><strong>Học viên:</strong> {sub.user?.username || sub.user?.id || 'Unknown'}</p>
+                          <p><strong>Thời gian nộp:</strong> {new Date(sub.createdAt).toLocaleString('vi-VN')}</p>
+                          <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem', flexWrap: 'wrap' }}>
+                            {sub.answerFileUrl && (
+                              <button onClick={() => handleDownload(sub.answerFileUrl, `Submission_${sub.id}`)} style={{ background: 'var(--primary-color)', color: 'white', border: 'none', padding: '0.4rem 0.8rem', borderRadius: '0.25rem', cursor: 'pointer', fontSize: '0.85rem' }}>
+                                📎 Tải File Bài Làm
+                              </button>
+                            )}
+                            <button onClick={() => navigate(`/submission/${sub.id}/result`)} style={{ background: 'var(--card-bg)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', padding: '0.4rem 0.8rem', borderRadius: '0.25rem', cursor: 'pointer', fontSize: '0.85rem' }}>
+                              🔍 Xem Kết Quả Chấm AI
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p style={{ color: 'var(--text-muted)' }}>Chưa có bài nộp nào.</p>
+                  )}
+                </div>
+
+                {/* Danh sách Feedback của bài học này */}
+                <div style={{ marginTop: '2.5rem', paddingTop: '1.5rem', borderTop: '1px solid var(--border-color)' }}>
+                  <h3 style={{ marginBottom: '1rem', color: 'var(--primary-color)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    💬 Phản Hồi Từ Học Viên Cho Bài Học Này ({lessonFeedbacks.length})
+                  </h3>
+                  {lessonFeedbacks.length > 0 ? (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                      {lessonFeedbacks.map(fb => (
+                        <div key={fb.id} style={{ background: 'var(--input-bg)', padding: '1.25rem', borderRadius: '0.75rem', border: '1px solid var(--border-color)' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem', flexWrap: 'wrap', gap: '0.25rem' }}>
+                            <strong>👤 {fb.user?.username || 'Học viên'} ({fb.user?.gmail || 'N/A'})</strong>
+                            <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                              {fb.createdAt ? new Date(fb.createdAt).toLocaleString('vi-VN') : ''}
+                            </span>
+                          </div>
+                          <div style={{ background: 'var(--card-bg)', padding: '0.85rem', borderRadius: '0.5rem', fontSize: '0.9rem', color: 'var(--text-primary)', lineHeight: 1.5, borderLeft: '3px solid var(--primary-color)' }}>
+                            {fb.comment}
+                          </div>
+                          {fb.submission && (
+                            <div style={{ marginTop: '0.5rem', textAlign: 'right' }}>
+                              <button onClick={() => navigate(`/submission/${fb.submission.id}/result`)} style={{ background: 'none', border: 'none', color: 'var(--primary-color)', cursor: 'pointer', fontSize: '0.8rem', textDecoration: 'underline' }}>
+                                Xem bài nộp liên quan →
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p style={{ color: 'var(--text-muted)' }}>Chưa có phản hồi nào cho bài học này.</p>
+                  )}
+                </div>
+              </>
             )}
           </div>
         ) : (

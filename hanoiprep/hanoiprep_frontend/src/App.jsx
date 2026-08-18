@@ -10,6 +10,7 @@ import LessonUpload from "./components/LessonUpload";
 import LessonView from "./components/LessonView";
 import StudentSubmission from "./components/StudentSubmission";
 import SubmissionResult from "./components/SubmissionResult";
+import CourseProviderFeedbacks from "./components/CourseProviderFeedbacks";
 import "./index.css"; // Ensure global CSS is loaded
 
 const App = () => {
@@ -25,6 +26,7 @@ const App = () => {
               <Route path="/signup" element={<Signup />} />
               <Route path="/admin/users" element={<UserManagement />} />
               <Route path="/provider/lessons/upload" element={<LessonUpload />} />
+              <Route path="/provider/feedbacks" element={<CourseProviderFeedbacks />} />
               <Route path="/learner/lessons" element={<LessonView />} />
               <Route path="/lesson/:id/submit" element={<StudentSubmission />} />
               <Route path="/submission/:id/result" element={<SubmissionResult />} />

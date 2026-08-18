@@ -96,20 +96,12 @@ public class UserController {
             user.setGmail(updateRequest.getGmail().trim());
         }
 
-        // 3. Đổi mật khẩu nếu có truyền password mới
-        if (updateRequest.getPassword() != null && !updateRequest.getPassword().isBlank()) {
-            if (updateRequest.getPassword().length() < 6) {
-                return ResponseEntity.badRequest().body(new MessageResponse("Error: Password must be at least 6 characters long!"));
-            }
-            user.setPassword(encoder.encode(updateRequest.getPassword()));
-        }
-
-        // 4. Đổi role nếu có
+        // 3. Đổi role nếu có
         if (updateRequest.getRole() != null && !updateRequest.getRole().isBlank()) {
             user.setRole(updateRequest.getRole());
         }
 
-        // 5. Đổi active nếu có
+        // 4. Đổi active nếu có
         if (updateRequest.getActive() != null) {
             user.setActive(updateRequest.getActive());
         }

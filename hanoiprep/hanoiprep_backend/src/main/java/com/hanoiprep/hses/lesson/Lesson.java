@@ -44,4 +44,9 @@ public class Lesson {
     @com.fasterxml.jackson.annotation.JsonIgnore
     @OneToMany(mappedBy = "lesson", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<Rubric> rubrics;
+
+    @com.fasterxml.jackson.annotation.JsonIgnore
+    @OneToMany(mappedBy = "lesson", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<com.hanoiprep.hses.feedback.Feedback> feedbacks;
 }
+
