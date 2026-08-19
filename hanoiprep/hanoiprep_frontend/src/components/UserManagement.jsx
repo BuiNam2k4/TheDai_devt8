@@ -37,7 +37,8 @@ const UserManagement = () => {
   const fetchUsers = () => {
     UserService.getAllUsers().then(
       (response) => {
-        setUsers(response.data);
+        const data = response.data && response.data.result ? response.data.result : response.data;
+        setUsers(Array.isArray(data) ? data : []);
       },
       (error) => {
         setMessage("Unauthorized or error fetching users.");

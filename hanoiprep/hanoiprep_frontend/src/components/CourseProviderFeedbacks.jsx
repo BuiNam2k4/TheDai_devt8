@@ -28,7 +28,8 @@ const CourseProviderFeedbacks = () => {
         : `http://localhost:8080/api/feedbacks/provider/${currentUser.id}`;
 
       const res = await axios.get(endpoint, { headers: authHeader() });
-      setFeedbacks(res.data || []);
+      const fbsData = res.data && res.data.result ? res.data.result : res.data;
+      setFeedbacks(Array.isArray(fbsData) ? fbsData : []);
     } catch (err) {
       console.error('Error fetching feedbacks:', err);
       setError('Không thể tải danh sách phản hồi từ máy chủ.');

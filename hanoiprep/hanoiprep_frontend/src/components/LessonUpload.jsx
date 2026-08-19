@@ -44,7 +44,8 @@ const LessonUpload = () => {
         headers: authHeader()
       });
 
-      const { rubricCount, rubricStatus } = res.data;
+      const resData = res.data && res.data.result ? res.data.result : res.data;
+      const { rubricCount, rubricStatus } = resData || {};
       setResult({ rubricCount, rubricStatus });
 
       // Reset form

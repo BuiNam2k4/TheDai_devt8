@@ -22,9 +22,12 @@ const LessonView = () => {
   const fetchLessons = async () => {
     try {
       const res = await axios.get('http://localhost:8080/api/lessons', { headers: authHeader() });
+      const lessonsData = res.data && res.data.result ? res.data.result : res.data;
       
       // Filter lessons: only show if they have both question and solution files
-      const validLessons = res.data.filter(lesson => lesson.questionFileUrl && lesson.solutionFileUrl);
+      const validLessons = (Array.isArray(lessonsData) ? lessonsData : []).filter(
+        lesson => lesson.questionFileUrl && lesson.solutionFileUrl
+      );
       
       setAvailableLessons(validLessons);
     } catch (error) {
@@ -37,14 +40,16 @@ const LessonView = () => {
     if (currentUser?.role === 'ROLE_COURSE_PROVIDER') {
       try {
         const subRes = await axios.get(`http://localhost:8080/api/submissions/lesson/${lesson.id}`, { headers: authHeader() });
-        setSubmissions(subRes.data);
+        const subsData = subRes.data && subRes.data.result ? subRes.data.result : subRes.data;
+        setSubmissions(Array.isArray(subsData) ? subsData : []);
       } catch (error) {
         console.error("Error fetching submissions", error);
       }
 
       try {
         const fbRes = await axios.get(`http://localhost:8080/api/feedbacks/lesson/${lesson.id}`, { headers: authHeader() });
-        setLessonFeedbacks(fbRes.data || []);
+        const fbsData = fbRes.data && fbRes.data.result ? fbRes.data.result : fbRes.data;
+        setLessonFeedbacks(Array.isArray(fbsData) ? fbsData : []);
       } catch (error) {
         console.error("Error fetching feedbacks", error);
       }
@@ -90,7 +95,8 @@ const LessonView = () => {
       });
 
       // Navigate đến trang kết quả chấm điểm AI
-      const submissionId = res.data?.id;
+      const subData = res.data && res.data.result ? res.data.result : res.data;
+      const submissionId = subData?.id;
       if (submissionId) {
         navigate(`/submission/${submissionId}/result`);
       } else {

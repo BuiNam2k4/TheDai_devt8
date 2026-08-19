@@ -18,10 +18,11 @@ const login = (username, password) => {
       password,
     })
     .then((response) => {
-      if (response.data.token) {
-        localStorage.setItem("user", JSON.stringify(response.data));
+      const data = response.data && response.data.result ? response.data.result : response.data;
+      if (data && data.token) {
+        localStorage.setItem("user", JSON.stringify(data));
       }
-      return response.data;
+      return data;
     });
 };
 

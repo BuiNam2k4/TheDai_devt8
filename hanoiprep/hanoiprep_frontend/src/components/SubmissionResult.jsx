@@ -28,7 +28,8 @@ const SubmissionResult = () => {
                     headers: authHeader(),
                 });
                 if (!subRes.ok) throw new Error('Không thể tải thông tin bài nộp.');
-                const subData = await subRes.json();
+                const subJson = await subRes.json();
+                const subData = subJson && subJson.result ? subJson.result : subJson;
                 setSubmission(subData);
 
                 // Nếu đã chấm xong thì tải chi tiết và kiểm tra feedback đã có chưa
@@ -37,8 +38,9 @@ const SubmissionResult = () => {
                         headers: authHeader(),
                     });
                     if (detRes.ok) {
-                        const detData = await detRes.json();
-                        setDetails(detData);
+                        const detJson = await detRes.json();
+                        const detData = detJson && detJson.result ? detJson.result : detJson;
+                        setDetails(Array.isArray(detData) ? detData : []);
                     }
 
                     // Tải feedback đã gửi trước đó (nếu có)
@@ -47,7 +49,8 @@ const SubmissionResult = () => {
                             headers: authHeader(),
                         });
                         if (fbRes.ok && fbRes.status === 200) {
-                            const fbData = await fbRes.json();
+                            const fbJson = await fbRes.json();
+                            const fbData = fbJson && fbJson.result ? fbJson.result : fbJson;
                             if (fbData && fbData.id) {
                                 setExistingFeedback(fbData);
                                 setFeedbackComment(fbData.comment || '');
@@ -116,7 +119,8 @@ const SubmissionResult = () => {
                 throw new Error(errText || 'Không thể gửi phản hồi.');
             }
 
-            const savedFb = await res.json();
+            const fbJson = await res.json();
+            const savedFb = fbJson && fbJson.result ? fbJson.result : fbJson;
             setExistingFeedback(savedFb);
             setFeedbackSuccessMsg('🎉 Phản hồi của bạn đã được ghi nhận và gửi đến giáo viên!');
         } catch (err) {
