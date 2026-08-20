@@ -46,4 +46,12 @@ public class LessonController {
         );
         return ResponseEntity.ok(ApiResponse.success("Tạo bài học thành công", result));
     }
+
+    @GetMapping("/{id}/download/{type}")
+    public ResponseEntity<org.springframework.core.io.Resource> downloadLessonFile(
+            @PathVariable Long id,
+            @PathVariable String type
+    ) {
+        return lessonService.downloadLessonFile(id, type);
+    }
 }

@@ -18,4 +18,5 @@ public interface LessonService {
             MultipartFile questionFile,
             MultipartFile solutionFile
     );
+    org.springframework.http.ResponseEntity<org.springframework.core.io.Resource> downloadLessonFile(Long id, String type);
 }

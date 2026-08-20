@@ -1,12 +1,49 @@
-import React from 'react';
+import React, { useState } from 'react';
 
-const LessonDetailCard = ({
-  selectedLesson,
-  currentUser,
-  selectedPdfUrl,
-  setSelectedPdfUrl,
-}) => {
+const LessonDetailCard = ({ selectedLesson, currentUser }) => {
+  const [downloading, setDownloading] = useState(false);
+
   if (!selectedLesson) return null;
+
+  const handleDownload = async (url, fallbackType) => {
+    if (!url) return;
+    setDownloading(true);
+
+    const safeTitle = (selectedLesson.title || 'BaiHoc')
+      .replace(/[^a-zA-Z0-9\s_-]/g, '')
+      .trim()
+      .replace(/\s+/g, '_');
+    const filename = `${safeTitle}_${fallbackType}.pdf`;
+
+    try {
+      // 1. Thử fetch trực tiếp qua blob
+      const response = await fetch(url);
+      if (!response.ok) throw new Error('Fetch failed');
+      const blob = await response.blob();
+      const blobUrl = window.URL.createObjectURL(new Blob([blob], { type: 'application/pdf' }));
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      link.setAttribute('download', filename);
+      document.body.appendChild(link);
+      link.click();
+      link.parentNode.removeChild(link);
+      window.URL.revokeObjectURL(blobUrl);
+    } catch (error) {
+      console.warn("Direct blob fetch failed, falling back to backend download proxy:", error);
+      // 2. Fallback qua endpoint backend để đảm bảo 100% tải đúng file .pdf không mã hóa
+      const backendType = fallbackType === 'DapAn' ? 'solution' : 'question';
+      const backendDownloadUrl = `http://localhost:8080/api/lessons/${selectedLesson.id}/download/${backendType}`;
+      
+      const link = document.createElement('a');
+      link.href = backendDownloadUrl;
+      link.setAttribute('download', filename);
+      document.body.appendChild(link);
+      link.click();
+      link.parentNode.removeChild(link);
+    } finally {
+      setDownloading(false);
+    }
+  };
 
   return (
     <div
@@ -19,75 +56,110 @@ const LessonDetailCard = ({
         backdropFilter: 'blur(10px)',
       }}
     >
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '0.75rem', marginBottom: '1rem' }}>
-        <div>
-          <span style={{ fontSize: '0.8rem', background: 'rgba(99, 102, 241, 0.15)', color: 'var(--primary-color)', padding: '3px 10px', borderRadius: '99px', fontWeight: '700' }}>
-            🏷️ {selectedLesson.category || 'Toán học'}
-          </span>
-          <h2 style={{ fontSize: '1.4rem', fontWeight: '700', color: 'var(--text-main)', marginTop: '0.5rem', marginBottom: '0.25rem' }}>
-            {selectedLesson.title}
-          </h2>
-          <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', margin: 0 }}>
-            {selectedLesson.description || 'Không có mô tả chi tiết.'}
+      {/* Thông tin bài học */}
+      <div style={{ marginBottom: '1rem' }}>
+        <span
+          style={{
+            fontSize: '0.8rem',
+            background: 'rgba(99, 102, 241, 0.15)',
+            color: 'var(--primary-color)',
+            padding: '3px 10px',
+            borderRadius: '99px',
+            fontWeight: '700',
+          }}
+        >
+          🏷️ {selectedLesson.category || 'Toán học'}
+        </span>
+        <h2 style={{ fontSize: '1.4rem', fontWeight: '700', color: 'var(--text-main)', marginTop: '0.5rem', marginBottom: '0.25rem' }}>
+          {selectedLesson.title}
+        </h2>
+        {selectedLesson.description && (
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', margin: '0.25rem 0' }}>
+            {selectedLesson.description}
           </p>
-        </div>
-      </div>
-
-      {/* Buttons mở tài liệu PDF */}
-      <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid var(--border-color)' }}>
-        {selectedLesson.questionFileUrl && (
-          <button
-            onClick={() => setSelectedPdfUrl(selectedPdfUrl === selectedLesson.questionFileUrl ? null : selectedLesson.questionFileUrl)}
-            style={{
-              background: selectedPdfUrl === selectedLesson.questionFileUrl ? 'var(--primary-color)' : 'var(--input-bg)',
-              color: selectedPdfUrl === selectedLesson.questionFileUrl ? 'white' : 'var(--text-main)',
-              border: '1px solid var(--border-color)',
-              padding: '0.55rem 1rem',
-              borderRadius: '0.5rem',
-              fontSize: '0.85rem',
-              fontWeight: '600',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.4rem',
-            }}
-          >
-            📄 {selectedPdfUrl === selectedLesson.questionFileUrl ? 'Ẩn Đề Bài PDF' : 'Xem Đề Bài PDF'}
-          </button>
         )}
-
-        {currentUser?.role === 'ROLE_COURSE_PROVIDER' && selectedLesson.solutionFileUrl && (
-          <button
-            onClick={() => setSelectedPdfUrl(selectedPdfUrl === selectedLesson.solutionFileUrl ? null : selectedLesson.solutionFileUrl)}
+        {selectedLesson.contentText && (
+          <div
             style={{
-              background: selectedPdfUrl === selectedLesson.solutionFileUrl ? '#10b981' : 'var(--input-bg)',
-              color: selectedPdfUrl === selectedLesson.solutionFileUrl ? 'white' : 'var(--text-main)',
-              border: '1px solid var(--border-color)',
-              padding: '0.55rem 1rem',
+              marginTop: '0.75rem',
+              padding: '0.85rem 1rem',
+              background: 'var(--input-bg)',
               borderRadius: '0.5rem',
-              fontSize: '0.85rem',
-              fontWeight: '600',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.4rem',
+              color: 'var(--text-main)',
+              fontSize: '0.9rem',
+              lineHeight: 1.6,
+              whiteSpace: 'pre-wrap',
+              border: '1px solid var(--border-color)',
             }}
           >
-            📝 {selectedPdfUrl === selectedLesson.solutionFileUrl ? 'Ẩn Đáp Án PDF' : 'Xem Đáp Án PDF'}
-          </button>
+            {selectedLesson.contentText}
+          </div>
         )}
       </div>
 
-      {/* PDF Preview Frame */}
-      {selectedPdfUrl && (
-        <div style={{ marginTop: '1.25rem', borderRadius: '0.75rem', overflow: 'hidden', border: '1px solid var(--border-color)' }}>
-          <iframe
-            src={selectedPdfUrl}
-            title="Tài liệu bài học"
-            style={{ width: '100%', height: '500px', border: 'none', background: 'white' }}
-          />
+      {/* Các liên kết Tải Đề Bài và Tải Đáp Án */}
+      <div
+        style={{
+          background: 'var(--input-bg)',
+          padding: '1rem 1.25rem',
+          borderRadius: '0.75rem',
+          borderLeft: '4px solid var(--primary-color)',
+          border: '1px solid var(--border-color)',
+          marginTop: '1.25rem',
+        }}
+      >
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+          {/* Tải Đề Bài */}
+          {selectedLesson.questionFileUrl && (
+            <div>
+              <a
+                href="#"
+                onClick={(e) => {
+                  e.preventDefault();
+                  handleDownload(selectedLesson.questionFileUrl, 'DeBai');
+                }}
+                style={{
+                  color: '#10b981',
+                  textDecoration: 'underline',
+                  fontSize: '0.95rem',
+                  fontWeight: '600',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.35rem',
+                  cursor: downloading ? 'wait' : 'pointer',
+                }}
+              >
+                <span>📎</span> Tải Đề Bài (PDF)
+              </a>
+            </div>
+          )}
+
+          {/* Tải Đáp Án / Hướng Dẫn Giải */}
+          {selectedLesson.solutionFileUrl && (currentUser?.role === 'ROLE_COURSE_PROVIDER' || currentUser?.role === 'ROLE_ADMIN') && (
+            <div>
+              <a
+                href="#"
+                onClick={(e) => {
+                  e.preventDefault();
+                  handleDownload(selectedLesson.solutionFileUrl, 'DapAn');
+                }}
+                style={{
+                  color: '#10b981',
+                  textDecoration: 'underline',
+                  fontSize: '0.95rem',
+                  fontWeight: '600',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.35rem',
+                  cursor: downloading ? 'wait' : 'pointer',
+                }}
+              >
+                <span>📎</span> Tải Đáp Án / Hướng Dẫn Giải (Dành cho Provider)
+              </a>
+            </div>
+          )}
         </div>
-      )}
+      </div>
     </div>
   );
 };

@@ -17,7 +17,6 @@ const LessonView = () => {
   const [selectedLesson, setSelectedLesson] = useState(null);
   const [submissions, setSubmissions] = useState([]);
   const [lessonFeedbacks, setLessonFeedbacks] = useState([]);
-  const [selectedPdfUrl, setSelectedPdfUrl] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [answerText, setAnswerText] = useState('');
 
@@ -31,7 +30,7 @@ const LessonView = () => {
       const lessonsData = res.data && res.data.result ? res.data.result : res.data;
       
       const validLessons = (Array.isArray(lessonsData) ? lessonsData : []).filter(
-        (lesson) => lesson.questionFileUrl && lesson.solutionFileUrl
+        (lesson) => lesson.title && (lesson.questionFileUrl || lesson.solutionFileUrl || lesson.materialFileUrl || lesson.contentText)
       );
       
       setAvailableLessons(validLessons);
@@ -63,7 +62,6 @@ const LessonView = () => {
         console.error('Error fetching feedbacks', error);
       }
     }
-    setSelectedPdfUrl(null);
   };
 
   const handleSubmitAssignment = async (e) => {
@@ -131,12 +129,10 @@ const LessonView = () => {
       <div style={{ flex: '2', minWidth: '320px' }}>
         {selectedLesson ? (
           <>
-            {/* Chi Tiết Bài Học & Xem PDF */}
+            {/* Chi Tiết Bài Học */}
             <LessonDetailCard
               selectedLesson={selectedLesson}
               currentUser={currentUser}
-              selectedPdfUrl={selectedPdfUrl}
-              setSelectedPdfUrl={setSelectedPdfUrl}
             />
 
             {/* Dành cho Learner: Form Nộp Bài */}

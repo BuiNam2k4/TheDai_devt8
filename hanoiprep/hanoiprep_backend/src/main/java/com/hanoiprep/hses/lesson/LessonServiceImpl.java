@@ -133,4 +133,44 @@ public class LessonServiceImpl implements LessonService {
 
         return response;
     }
+
+    @Override
+    public org.springframework.http.ResponseEntity<org.springframework.core.io.Resource> downloadLessonFile(Long lessonId, String type) {
+        Lesson lesson = getLessonById(lessonId);
+        String fileUrl = "solution".equalsIgnoreCase(type) ? lesson.getSolutionFileUrl() : lesson.getQuestionFileUrl();
+
+        if (fileUrl == null || fileUrl.trim().isEmpty()) {
+            throw new AppException(ErrorCode.LESSON_NOT_FOUND, "Không tìm thấy file tài liệu cho bài học này");
+        }
+
+        try {
+            byte[] fileBytes;
+            if (fileUrl.startsWith("http://") || fileUrl.startsWith("https://")) {
+                java.net.URI uri = java.net.URI.create(fileUrl);
+                try (java.io.InputStream in = uri.toURL().openStream()) {
+                    fileBytes = in.readAllBytes();
+                }
+            } else {
+                java.io.File file = new java.io.File(fileUrl);
+                fileBytes = java.nio.file.Files.readAllBytes(file.toPath());
+            }
+
+            String sanitizedTitle = lesson.getTitle() != null 
+                    ? lesson.getTitle().replaceAll("[^a-zA-Z0-9\\u00C0-\\u1EF9\\s_-]", "").trim().replaceAll("\\s+", "_")
+                    : "bai_hoc";
+            String suffix = "solution".equalsIgnoreCase(type) ? "Dap_An.pdf" : "De_Bai.pdf";
+            String filename = sanitizedTitle + "_" + suffix;
+
+            org.springframework.core.io.ByteArrayResource resource = new org.springframework.core.io.ByteArrayResource(fileBytes);
+
+            return org.springframework.http.ResponseEntity.ok()
+                    .header(org.springframework.http.HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + filename + "\"")
+                    .contentType(org.springframework.http.MediaType.APPLICATION_PDF)
+                    .contentLength(fileBytes.length)
+                    .body(resource);
+        } catch (Exception e) {
+            log.error("Lỗi khi tải file bài học: {}", e.getMessage(), e);
+            throw new AppException(ErrorCode.FILE_UPLOAD_FAILED, "Lỗi đọc tệp tin bài học: " + e.getMessage());
+        }
+    }
 }
