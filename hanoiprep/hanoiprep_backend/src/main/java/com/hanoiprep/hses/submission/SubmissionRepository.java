@@ -8,5 +8,6 @@ import java.util.List;
 @Repository
 public interface SubmissionRepository extends JpaRepository<Submission, Long> {
     List<Submission> findByUserId(Long userId);
+    List<Submission> findByUserIdOrderByCreatedAtDesc(Long userId);
     List<Submission> findByLessonId(Long lessonId);
 }

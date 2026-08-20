@@ -91,6 +91,11 @@ public class SubmissionServiceImpl implements SubmissionService {
     }
 
     @Override
+    public List<Submission> getSubmissionsByUser(Long userId) {
+        return submissionRepository.findByUserIdOrderByCreatedAtDesc(userId);
+    }
+
+    @Override
     public Submission getSubmissionById(Long id) {
         return submissionRepository.findById(id)
                 .orElseThrow(() -> new AppException(ErrorCode.SUBMISSION_NOT_FOUND));

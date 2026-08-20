@@ -33,6 +33,11 @@ public class SubmissionController {
         return ResponseEntity.ok(ApiResponse.success(submissionService.getSubmissionsByLesson(lessonId)));
     }
 
+    @GetMapping("/user/{userId}")
+    public ResponseEntity<ApiResponse<List<Submission>>> getSubmissionsByUser(@PathVariable Long userId) {
+        return ResponseEntity.ok(ApiResponse.success(submissionService.getSubmissionsByUser(userId)));
+    }
+
     @GetMapping("/{id}")
     public ResponseEntity<ApiResponse<Submission>> getSubmissionById(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponse.success(submissionService.getSubmissionById(id)));
