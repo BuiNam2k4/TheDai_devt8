@@ -31,11 +31,18 @@ const Navbar = () => {
             </li>
           )}
           {currentUser?.role === "ROLE_COURSE_PROVIDER" && (
-            <li className="nav-item">
-              <Link to="/provider/lessons/upload" className="nav-link">
-                Create Lesson
-              </Link>
-            </li>
+            <>
+              <li className="nav-item">
+                <Link to="/provider/lessons/upload" className="nav-link">
+                  Create Lesson
+                </Link>
+              </li>
+              <li className="nav-item">
+                <Link to="/provider/feedbacks" className="nav-link">
+                  Feedbacks
+                </Link>
+              </li>
+            </>
           )}
           {(currentUser?.role === "ROLE_LEARNER" || currentUser?.role === "ROLE_COURSE_PROVIDER") && (
             <li className="nav-item">

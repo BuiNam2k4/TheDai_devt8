@@ -22,7 +22,7 @@ const StudentSubmission = () => {
                 });
                 if (response.ok) {
                     const data = await response.json();
-                    setLesson(data);
+                    setLesson(data && data.result ? data.result : data);
                 } else {
                     setError('Không thể tải bài học.');
                 }
@@ -57,7 +57,8 @@ const StudentSubmission = () => {
             });
 
             if (response.ok) {
-                const result = await response.json();
+                const json = await response.json();
+                const result = json && json.result ? json.result : json;
                 // Successfully submitted and graded
                 navigate(`/submission/${result.id}/result`);
             } else {
