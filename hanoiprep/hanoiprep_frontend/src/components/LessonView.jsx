@@ -77,8 +77,17 @@ const LessonView = () => {
     const fileInput = document.getElementById('assignmentFileInput');
     const file = fileInput?.files[0];
 
+    if (file) {
+      const lower = file.name.toLowerCase();
+      if (!lower.endsWith('.pdf') && !lower.endsWith('.png') && !lower.endsWith('.jpg') && !lower.endsWith('.jpeg')) {
+        alert(`Tệp tin "${file.name}" không hợp lệ!\n\nHệ thống chỉ cho phép nộp file định dạng PDF (.pdf) hoặc Hình ảnh (.png, .jpg, .jpeg). Vui lòng chuyển đổi sang PDF hoặc chụp ảnh bài làm.`);
+        if (fileInput) fileInput.value = '';
+        return;
+      }
+    }
+
     if (!answerText.trim() && !file) {
-      alert('Vui lòng nhập lời giải hoặc tải lên file bài làm.');
+      alert('Vui lòng nhập lời giải hoặc tải lên file bài làm (PDF/Ảnh).');
       return;
     }
 
@@ -110,7 +119,8 @@ const LessonView = () => {
       }
     } catch (error) {
       console.error('Lỗi khi nộp bài:', error);
-      alert('Có lỗi xảy ra khi nộp bài. Vui lòng thử lại.');
+      const serverMsg = error.response?.data?.message;
+      alert(serverMsg || 'Có lỗi xảy ra khi nộp bài. Vui lòng kiểm tra lại file đính kèm (chỉ nhận PDF hoặc Hình ảnh).');
     } finally {
       setIsSubmitting(false);
     }

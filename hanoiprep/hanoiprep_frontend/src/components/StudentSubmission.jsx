@@ -90,10 +90,17 @@ const StudentSubmission = () => {
             <div className="mb-8 p-6 bg-gray-50 rounded-xl border border-gray-100">
                 <h3 className="text-xl font-semibold text-gray-700 mb-4">Nội dung đề bài:</h3>
                 <p className="text-gray-700 whitespace-pre-wrap leading-relaxed">{lesson.contentText}</p>
-                {lesson.questionFileUrl && (
+                {lesson.materialFileUrl && (
                     <div className="mt-4">
-                        <a href={lesson.questionFileUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-800 font-medium underline">
-                            Xem tệp đính kèm đề bài
+                        <a href={lesson.materialFileUrl} target="_blank" rel="noopener noreferrer" className="text-indigo-600 hover:text-indigo-800 font-medium underline inline-flex items-center gap-1">
+                            <span>📘</span> Xem tệp tài liệu học tập / giáo trình
+                        </a>
+                    </div>
+                )}
+                {lesson.questionFileUrl && (
+                    <div className="mt-2">
+                        <a href={lesson.questionFileUrl} target="_blank" rel="noopener noreferrer" className="text-emerald-600 hover:text-emerald-800 font-medium underline inline-flex items-center gap-1">
+                            <span>📝</span> Xem tệp đính kèm đề bài
                         </a>
                     </div>
                 )}
@@ -113,10 +120,23 @@ const StudentSubmission = () => {
                 </div>
                 
                 <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Hoặc tải lên tệp bài làm (Tuỳ chọn):</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Hoặc tải lên tệp bài làm (PDF hoặc Ảnh .png, .jpg):</label>
                     <input
                         type="file"
-                        onChange={(e) => setAnswerFile(e.target.files[0])}
+                        accept=".pdf,.png,.jpg,.jpeg,application/pdf,image/png,image/jpeg,image/jpg"
+                        onChange={(e) => {
+                            const f = e.target.files[0];
+                            if (f) {
+                                const lower = f.name.toLowerCase();
+                                if (!lower.endsWith('.pdf') && !lower.endsWith('.png') && !lower.endsWith('.jpg') && !lower.endsWith('.jpeg')) {
+                                    alert(`Tệp tin "${f.name}" không hợp lệ!\n\nHệ thống chỉ cho phép nộp file định dạng PDF (.pdf) hoặc Hình ảnh (.png, .jpg, .jpeg).`);
+                                    e.target.value = '';
+                                    setAnswerFile(null);
+                                    return;
+                                }
+                            }
+                            setAnswerFile(f);
+                        }}
                         className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 transition-colors"
                     />
                 </div>

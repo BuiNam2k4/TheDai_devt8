@@ -53,7 +53,17 @@ const LessonSubmitForm = ({
           <input
             type="file"
             id="assignmentFileInput"
-            accept="application/pdf,image/png,image/jpeg,image/jpg"
+            accept=".pdf,.png,.jpg,.jpeg,application/pdf,image/png,image/jpeg,image/jpg"
+            onChange={(e) => {
+              const file = e.target.files[0];
+              if (file) {
+                const lower = file.name.toLowerCase();
+                if (!lower.endsWith('.pdf') && !lower.endsWith('.png') && !lower.endsWith('.jpg') && !lower.endsWith('.jpeg')) {
+                  alert(`Tệp tin "${file.name}" không hợp lệ!\n\nHệ thống chỉ cho phép nộp file định dạng PDF (.pdf) hoặc Hình ảnh (.png, .jpg, .jpeg). Vui lòng chọn lại.`);
+                  e.target.value = '';
+                }
+              }
+            }}
             style={{
               width: '100%',
               padding: '0.6rem 0.85rem',

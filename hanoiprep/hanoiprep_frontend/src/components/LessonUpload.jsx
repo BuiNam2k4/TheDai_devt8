@@ -23,6 +23,20 @@ const LessonUpload = () => {
       return;
     }
 
+    const isValidFileType = (file) => {
+      if (!file) return true;
+      const lower = file.name.toLowerCase();
+      return lower.endsWith('.pdf') || lower.endsWith('.png') || lower.endsWith('.jpg') || lower.endsWith('.jpeg');
+    };
+
+    const materialInput = document.getElementById('lessonMaterialInput');
+    const materialFile = materialInput?.files[0];
+
+    if (!isValidFileType(currentQuestionFile) || !isValidFileType(currentSolutionFile) || !isValidFileType(materialFile)) {
+      alert('Tệp tin không hợp lệ!\n\nHệ thống chỉ chấp nhận file định dạng PDF (.pdf) hoặc Hình ảnh (.png, .jpg, .jpeg). Các định dạng khác như .docx, .doc, .txt không được hỗ trợ.');
+      return;
+    }
+
     setIsSubmitting(true);
     setResult(null);
 
