@@ -51,6 +51,13 @@ const Navbar = () => {
               </Link>
             </li>
           )}
+          {currentUser?.role === "ROLE_LEARNER" && (
+            <li className="nav-item">
+              <Link to="/learner/history" className="nav-link">
+                Lịch Sử & Điểm Số
+              </Link>
+            </li>
+          )}
           {currentUser ? (
             <>
               <li className="nav-item">

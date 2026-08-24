@@ -17,17 +17,14 @@ public class Lesson {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @Column(columnDefinition = "NVARCHAR(500)")
     private String title;
+
+    @Column(columnDefinition = "NVARCHAR(255)")
     private String category;
     
     @Column(columnDefinition = "NVARCHAR(MAX)")
     private String contentText;
-
-    @Column(columnDefinition = "NVARCHAR(MAX)")
-    private String contentLatex;
-
-    @Column(columnDefinition = "NVARCHAR(MAX)")
-    private String solutionSteps;
 
     private String materialFileUrl;
     private String questionFileUrl;

@@ -33,17 +33,23 @@ public class LessonController {
             @RequestParam("title") String title,
             @RequestParam("category") String category,
             @RequestParam(value = "contentText", required = false) String contentText,
-            @RequestParam(value = "contentLatex", required = false) String contentLatex,
-            @RequestParam(value = "solutionSteps", required = false) String solutionSteps,
             @RequestParam("providerId") Long providerId,
             @RequestPart(value = "materialFile", required = false) MultipartFile materialFile,
             @RequestPart(value = "questionFile", required = false) MultipartFile questionFile,
             @RequestPart(value = "solutionFile", required = false) MultipartFile solutionFile
     ) {
         Map<String, Object> result = lessonService.createLesson(
-                title, category, contentText, contentLatex, solutionSteps, providerId,
+                title, category, contentText, providerId,
                 materialFile, questionFile, solutionFile
         );
         return ResponseEntity.ok(ApiResponse.success("Tạo bài học thành công", result));
+    }
+
+    @GetMapping("/{id}/download/{type}")
+    public ResponseEntity<org.springframework.core.io.Resource> downloadLessonFile(
+            @PathVariable Long id,
+            @PathVariable String type
+    ) {
+        return lessonService.downloadLessonFile(id, type);
     }
 }

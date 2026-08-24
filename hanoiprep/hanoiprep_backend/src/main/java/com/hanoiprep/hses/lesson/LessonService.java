@@ -11,11 +11,10 @@ public interface LessonService {
             String title,
             String category,
             String contentText,
-            String contentLatex,
-            String solutionSteps,
             Long providerId,
             MultipartFile materialFile,
             MultipartFile questionFile,
             MultipartFile solutionFile
     );
+    org.springframework.http.ResponseEntity<org.springframework.core.io.Resource> downloadLessonFile(Long id, String type);
 }

@@ -40,6 +40,17 @@ public class SubmissionServiceImpl implements SubmissionService {
         Lesson lesson = lessonRepository.findById(lessonId)
                 .orElseThrow(() -> new AppException(ErrorCode.LESSON_NOT_FOUND));
 
+        if (answerFile != null && !answerFile.isEmpty()) {
+            String filename = answerFile.getOriginalFilename();
+            if (filename != null) {
+                String lower = filename.toLowerCase();
+                if (!lower.endsWith(".pdf") && !lower.endsWith(".png") && !lower.endsWith(".jpg") && !lower.endsWith(".jpeg")) {
+                    throw new AppException(ErrorCode.INVALID_INPUT,
+                            "File bài nộp không hợp lệ ('" + filename + "'). Hệ thống chỉ chấp nhận file PDF (.pdf) hoặc Hình ảnh (.png, .jpg, .jpeg).");
+                }
+            }
+        }
+
         Submission submission = new Submission();
         submission.setUser(user);
         submission.setLesson(lesson);
@@ -88,6 +99,11 @@ public class SubmissionServiceImpl implements SubmissionService {
     @Override
     public List<Submission> getSubmissionsByLesson(Long lessonId) {
         return submissionRepository.findByLessonId(lessonId);
+    }
+
+    @Override
+    public List<Submission> getSubmissionsByUser(Long userId) {
+        return submissionRepository.findByUserIdOrderByCreatedAtDesc(userId);
     }
 
     @Override

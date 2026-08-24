@@ -31,10 +31,15 @@ public class CloudinaryService {
             throw new IllegalArgumentException("Cannot upload empty file");
         }
 
-        // Upload to Cloudinary. For PDFs, we should set resource_type to "raw" or "auto"
-        Map<?, ?> uploadResult = cloudinary.uploader().upload(file.getBytes(), ObjectUtils.asMap(
-                "resource_type", "raw"
-        ));
+        String originalFilename = file.getOriginalFilename();
+        Map<String, Object> params = new java.util.HashMap<>();
+        params.put("resource_type", "raw");
+        if (originalFilename != null && !originalFilename.isEmpty()) {
+            params.put("use_filename", true);
+            params.put("unique_filename", true);
+        }
+
+        Map<?, ?> uploadResult = cloudinary.uploader().upload(file.getBytes(), params);
 
         return uploadResult.get("secure_url").toString();
     }
