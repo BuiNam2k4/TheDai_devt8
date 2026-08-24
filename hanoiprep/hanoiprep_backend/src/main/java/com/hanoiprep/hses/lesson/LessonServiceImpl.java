@@ -58,6 +58,11 @@ public class LessonServiceImpl implements LessonService {
         User provider = userRepository.findById(providerId)
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND, "Provider không tồn tại"));
 
+        // Validate file extensions: chỉ cho phép PDF hoặc Ảnh (PNG, JPG, JPEG)
+        validateAllowedFile(materialFile, "Tài liệu");
+        validateAllowedFile(questionFile, "Đề bài");
+        validateAllowedFile(solutionFile, "Đáp án");
+
         byte[] solutionBytes = null;
         String solutionOriginalName = null;
         if (solutionFile != null && !solutionFile.isEmpty()) {
@@ -102,10 +107,11 @@ public class LessonServiceImpl implements LessonService {
             try {
                 final byte[] finalBytes = solutionBytes;
                 final String finalName = solutionOriginalName;
+                final String detectedMime = detectMimeType(finalName);
                 MultipartFile solutionCopy = new MultipartFile() {
                     @Override public String getName() { return "solutionFile"; }
                     @Override public String getOriginalFilename() { return finalName; }
-                    @Override public String getContentType() { return "application/pdf"; }
+                    @Override public String getContentType() { return detectedMime; }
                     @Override public boolean isEmpty() { return finalBytes.length == 0; }
                     @Override public long getSize() { return finalBytes.length; }
                     @Override public byte[] getBytes() { return finalBytes; }
@@ -134,6 +140,27 @@ public class LessonServiceImpl implements LessonService {
         return response;
     }
 
+    private void validateAllowedFile(MultipartFile file, String fieldName) {
+        if (file == null || file.isEmpty()) return;
+        String filename = file.getOriginalFilename();
+        if (filename == null || filename.isBlank()) {
+            throw new AppException(ErrorCode.INVALID_INPUT, "Tệp tin " + fieldName + " không hợp lệ.");
+        }
+        String lower = filename.toLowerCase();
+        if (!lower.endsWith(".pdf") && !lower.endsWith(".png") && !lower.endsWith(".jpg") && !lower.endsWith(".jpeg")) {
+            throw new AppException(ErrorCode.INVALID_INPUT,
+                    "Tệp tin " + fieldName + " không hợp lệ ('" + filename + "'). Hệ thống chỉ cho phép nộp file định dạng PDF (.pdf) hoặc Hình ảnh (.png, .jpg, .jpeg).");
+        }
+    }
+
+    private String detectMimeType(String filename) {
+        if (filename == null) return "application/pdf";
+        String lower = filename.toLowerCase();
+        if (lower.endsWith(".png")) return "image/png";
+        if (lower.endsWith(".jpg") || lower.endsWith(".jpeg")) return "image/jpeg";
+        return "application/pdf";
+    }
+
     @Override
     public org.springframework.http.ResponseEntity<org.springframework.core.io.Resource> downloadLessonFile(Long lessonId, String type) {
         Lesson lesson = getLessonById(lessonId);
@@ -158,14 +185,26 @@ public class LessonServiceImpl implements LessonService {
             String sanitizedTitle = lesson.getTitle() != null 
                     ? lesson.getTitle().replaceAll("[^a-zA-Z0-9\\u00C0-\\u1EF9\\s_-]", "").trim().replaceAll("\\s+", "_")
                     : "bai_hoc";
-            String suffix = "solution".equalsIgnoreCase(type) ? "Dap_An.pdf" : "De_Bai.pdf";
+            
+            String ext = ".pdf";
+            org.springframework.http.MediaType mediaType = org.springframework.http.MediaType.APPLICATION_PDF;
+            String lowerUrl = fileUrl.toLowerCase();
+            if (lowerUrl.endsWith(".png")) {
+                ext = ".png";
+                mediaType = org.springframework.http.MediaType.IMAGE_PNG;
+            } else if (lowerUrl.endsWith(".jpg") || lowerUrl.endsWith(".jpeg")) {
+                ext = ".jpg";
+                mediaType = org.springframework.http.MediaType.IMAGE_JPEG;
+            }
+
+            String suffix = ("solution".equalsIgnoreCase(type) ? "Dap_An" : "De_Bai") + ext;
             String filename = sanitizedTitle + "_" + suffix;
 
             org.springframework.core.io.ByteArrayResource resource = new org.springframework.core.io.ByteArrayResource(fileBytes);
 
             return org.springframework.http.ResponseEntity.ok()
                     .header(org.springframework.http.HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + filename + "\"")
-                    .contentType(org.springframework.http.MediaType.APPLICATION_PDF)
+                    .contentType(mediaType)
                     .contentLength(fileBytes.length)
                     .body(resource);
         } catch (Exception e) {

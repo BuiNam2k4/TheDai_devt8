@@ -53,7 +53,7 @@ const LessonSubmitForm = ({
           <input
             type="file"
             id="assignmentFileInput"
-            accept="image/*,application/pdf"
+            accept="application/pdf,image/png,image/jpeg,image/jpg"
             style={{
               width: '100%',
               padding: '0.6rem 0.85rem',

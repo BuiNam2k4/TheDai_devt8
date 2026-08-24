@@ -71,22 +71,19 @@ public class RubricExtractionService {
         }
 
         try {
-            byte[] pdfBytes = solutionFile.getBytes();
-            String pdfText = extractTextFromPdf(pdfBytes);
+            byte[] fileBytes = solutionFile.getBytes();
+            String originalName = solutionFile.getOriginalFilename();
+            String mimeType = resolveMimeType(originalName);
 
-            log.info("Processing solution PDF ({} bytes, {} extracted text chars) for lesson {}...",
-                    pdfBytes.length, pdfText != null ? pdfText.length() : 0, lesson.getId());
-
-            List<RubricDto> rubricDtos;
-            if (pdfText != null && pdfText.trim().length() >= 100) {
-                // PDF dạng văn bản có text rõ ràng
-                rubricDtos = callGeminiForRubrics(lesson, pdfText, null);
-            } else {
-                // PDF dạng ảnh scan / viết tay -> gửi trực tiếp file PDF binary qua Gemini
-                // Multimodal
-                log.info("PDF text is sparse or scanned. Using Gemini Multimodal for lesson {}...", lesson.getId());
-                rubricDtos = callGeminiForRubrics(lesson, null, pdfBytes);
+            String pdfText = null;
+            if ("application/pdf".equals(mimeType)) {
+                pdfText = extractTextFromPdf(fileBytes);
             }
+
+            log.info("Processing solution file '{}' ({} bytes, mime: {}, {} extracted chars) for lesson {} via Gemini...",
+                    originalName, fileBytes.length, mimeType, pdfText != null ? pdfText.length() : 0, lesson.getId());
+
+            List<RubricDto> rubricDtos = callGeminiForRubrics(lesson, pdfText, fileBytes, mimeType);
 
             return saveRubrics(lesson, rubricDtos);
         } catch (Exception e) {
@@ -96,30 +93,31 @@ public class RubricExtractionService {
     }
 
     /**
-     * Trích xuất từ Lesson entity (tải PDF từ Cloudinary hoặc dùng solutionSteps /
-     * contentText),
+     * Trích xuất từ Lesson entity (tải PDF/Ảnh từ Cloudinary hoặc dùng solutionSteps / contentText),
      * tự động sinh Rubrics mới từ AI và lưu vào DB.
      */
     @Transactional
     public List<Rubric> extractAndSaveRubricsFromLessonEntity(Lesson lesson) {
         String solutionText = null;
-        byte[] pdfBytes = null;
+        byte[] fileBytes = null;
+        String mimeType = "application/pdf";
 
-        // 1. Thử tải PDF từ URL Cloudinary (nếu có)
+        // 1. Thử tải file từ URL Cloudinary (nếu có)
         if (lesson.getSolutionFileUrl() != null && !lesson.getSolutionFileUrl().isBlank()) {
             try {
-                pdfBytes = restTemplate.getForObject(lesson.getSolutionFileUrl(), byte[].class);
-                if (pdfBytes != null && pdfBytes.length > 0) {
-                    solutionText = extractTextFromPdf(pdfBytes);
+                mimeType = resolveMimeType(lesson.getSolutionFileUrl());
+                fileBytes = restTemplate.getForObject(lesson.getSolutionFileUrl(), byte[].class);
+                if (fileBytes != null && fileBytes.length > 0 && "application/pdf".equals(mimeType)) {
+                    solutionText = extractTextFromPdf(fileBytes);
                 }
             } catch (Exception e) {
-                log.warn("Could not download solution PDF from URL [{}]: {}", lesson.getSolutionFileUrl(),
+                log.warn("Could not download solution file from URL [{}]: {}", lesson.getSolutionFileUrl(),
                         e.getMessage());
             }
         }
 
-        // 2. Nếu không có PDF hoặc không tải được, dùng solutionSteps hoặc contentText
-        if ((pdfBytes == null || pdfBytes.length == 0) && (solutionText == null || solutionText.isBlank())) {
+        // 2. Nếu không có file hoặc không tải được, dùng solutionSteps hoặc contentText
+        if ((fileBytes == null || fileBytes.length == 0) && (solutionText == null || solutionText.isBlank())) {
             if (lesson.getSolutionSteps() != null && !lesson.getSolutionSteps().isBlank()) {
                 solutionText = lesson.getSolutionSteps();
             } else if (lesson.getContentText() != null && !lesson.getContentText().isBlank()) {
@@ -131,22 +129,28 @@ public class RubricExtractionService {
 
         try {
             List<RubricDto> rubricDtos;
-            if (pdfBytes != null && pdfBytes.length > 0
-                    && (solutionText == null || solutionText.trim().length() < 80)) {
-                // Sử dụng Multimodal với PDF binary từ Cloudinary
-                log.info("Calling Gemini Multimodal with Cloudinary PDF ({} bytes) for lesson {}...", pdfBytes.length,
-                        lesson.getId());
-                rubricDtos = callGeminiForRubrics(lesson, null, pdfBytes);
+            if (fileBytes != null && fileBytes.length > 0) {
+                log.info("Calling Gemini Multimodal with Cloudinary file ({} bytes, mime: {}) for lesson {}...", fileBytes.length,
+                        mimeType, lesson.getId());
+                rubricDtos = callGeminiForRubrics(lesson, solutionText, fileBytes, mimeType);
             } else {
                 log.info("Calling Gemini with text ({} chars) for lesson {}...",
                         solutionText != null ? solutionText.length() : 0, lesson.getId());
-                rubricDtos = callGeminiForRubrics(lesson, solutionText, null);
+                rubricDtos = callGeminiForRubrics(lesson, solutionText, null, null);
             }
             return saveRubrics(lesson, rubricDtos);
         } catch (Exception e) {
             log.error("Fallback rubric generation failed for lesson {}: {}", lesson.getId(), e.getMessage());
             return createDefaultRubric(lesson);
         }
+    }
+
+    private String resolveMimeType(String filename) {
+        if (filename == null) return "application/pdf";
+        String lower = filename.toLowerCase();
+        if (lower.endsWith(".png")) return "image/png";
+        if (lower.endsWith(".jpg") || lower.endsWith(".jpeg")) return "image/jpeg";
+        return "application/pdf";
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -175,22 +179,32 @@ public class RubricExtractionService {
     // ─────────────────────────────────────────────────────────────────────────
     // Bước 2: Gọi Gemini AI sinh rubrics chi tiết từ text hoặc PDF binary
     // ─────────────────────────────────────────────────────────────────────────
-    private List<RubricDto> callGeminiForRubrics(Lesson lesson, String textContent, byte[] pdfBytes) throws Exception {
+    private List<RubricDto> callGeminiForRubrics(Lesson lesson, String textContent, byte[] mediaBytes, String mimeType) throws Exception {
         String lessonTitle = (lesson.getTitle() != null && !lesson.getTitle().isBlank())
                 ? lesson.getTitle()
                 : "Bài tập tự luận";
 
         String solutionSection;
-        if (textContent != null && !textContent.isBlank()) {
+        if (mediaBytes != null && mediaBytes.length > 0) {
+            if (textContent != null && !textContent.isBlank()) {
+                solutionSection = """
+                        ## NỘI DUNG ĐÁP ÁN (VĂN BẢN BÓC TÁCH):
+                        %s
+
+                        ## TÀI LIỆU ĐÍNH KÈM (PDF / HÌNH ẢNH):
+                        Có đính kèm file gốc. Hãy đọc kết hợp cả văn bản trên và các hình ảnh, sơ đồ, đồ thị, bảng biểu trong tài liệu đính kèm để lập barem chuẩn xác.
+                        """.formatted(textContent);
+            } else {
+                solutionSection = """
+                        ## NỘI DUNG ĐÁP ÁN:
+                        Vui lòng đọc và phân tích trực tiếp từ tài liệu PDF / hình ảnh barem đính kèm (bao gồm cả chữ viết, hình vẽ và công thức).
+                        """;
+            }
+        } else {
             solutionSection = """
                     ## NỘI DUNG ĐÁP ÁN / HƯỚNG DẪN GIẢI:
                     %s
-                    """.formatted(textContent);
-        } else {
-            solutionSection = """
-                    ## NỘI DUNG ĐÁP ÁN:
-                    Vui lòng đọc và phân tích trực tiếp từ tài liệu PDF / hình ảnh barem đính kèm.
-                    """;
+                    """.formatted(textContent != null ? textContent : "");
         }
 
         String prompt = """
@@ -210,7 +224,7 @@ public class RubricExtractionService {
                    - NẾU Barem không ghi điểm từng bước: Tự phân bổ điểm hợp lý theo độ khó/khối lượng kiến thức của từng bước.
                    - **ĐIỀU KIỆN RÀNG BUỘC:** Tổng `maxScore` của toàn bộ các `stepOrder` trong cùng một `questionNo` BẮT BUỘC phải BẰNG TỔNG ĐIỂM của câu hỏi đó trong đề/đáp án gốc, và tổng toàn bài bằng 10.0.
 
-                3. **Mô tả tiêu chí (`stepDescription`):** 
+                3. **Mô tả tiêu chí (`stepDescription`):**
                    - Viết ngắn gọn, rõ ràng những gì học sinh CẦN ĐẠT ĐƯỢC để lấy điểm bước này.
 
                 4. **Từ khóa & Kết quả chốt (`expectedLogicKeyword`):**
@@ -228,11 +242,12 @@ public class RubricExtractionService {
                 - Chỉ trả về duy nhất 1 chuỗi JSON Array hợp lệ.
                 - KHÔNG bọc trong thẻ ```json ``` hoặc bất kỳ thẻ markdown nào khác.
                 - KHÔNG chèn thêm bất kỳ lời chào, văn bản giải thích hay phản hồi nào ngoài JSON Array.
-                """.formatted(lessonTitle, solutionSection);
+                """
+                .formatted(lessonTitle, solutionSection);
 
         String rawResponse;
-        if (pdfBytes != null && pdfBytes.length > 0) {
-            rawResponse = geminiService.callGeminiWithMedia(prompt, pdfBytes, "application/pdf");
+        if (mediaBytes != null && mediaBytes.length > 0) {
+            rawResponse = geminiService.callGeminiWithMedia(prompt, mediaBytes, (mimeType != null && !mimeType.isBlank()) ? mimeType : "application/pdf");
         } else {
             rawResponse = geminiService.callGemini(prompt);
         }
@@ -366,7 +381,8 @@ public class RubricExtractionService {
             }
         }
 
-        // 3. Fallback: Regex trích xuất tất cả các đối tượng JSON {...} hoàn chỉnh hợp lệ
+        // 3. Fallback: Regex trích xuất tất cả các đối tượng JSON {...} hoàn chỉnh hợp
+        // lệ
         java.util.regex.Pattern pattern = java.util.regex.Pattern.compile("\\{[^{}]*\\}");
         java.util.regex.Matcher matcher = pattern.matcher(text);
         List<String> validObjects = new ArrayList<>();

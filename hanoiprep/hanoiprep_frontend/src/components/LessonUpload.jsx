@@ -130,14 +130,14 @@ const LessonUpload = () => {
           </div>
 
           <div className="form-group">
-            <label>Upload Lesson Materials (PDF, Optional)</label>
-            <input id="lessonMaterialInput" type="file" accept="application/pdf" className="form-control" />
+            <label>Upload Lesson Materials (PDF / Ảnh PNG, JPG, Optional)</label>
+            <input id="lessonMaterialInput" type="file" accept="application/pdf,image/png,image/jpeg,image/jpg" className="form-control" />
           </div>
 
           <hr style={{ borderColor: 'var(--border-color)', margin: '2rem 0' }} />
 
           {/* ── Files đề bài & đáp án ── */}
-          <h3 style={{ marginBottom: '0.5rem' }}>Assignment Files</h3>
+          <h3 style={{ marginBottom: '0.5rem' }}>Assignment Files (PDF hoặc Hình ảnh)</h3>
 
           <div style={{
             background: 'rgba(99, 102, 241, 0.06)',
@@ -149,18 +149,18 @@ const LessonUpload = () => {
             color: 'var(--text-muted)',
             lineHeight: 1.6
           }}>
-            🤖 <strong style={{ color: 'var(--primary-color)' }}>AI sẽ tự động phân tích file Đáp án</strong> để tạo ra tiêu chí chấm điểm (rubric).
-            File đáp án cần là <strong>PDF văn bản</strong> (không phải scan) để AI đọc được nội dung.
+            🤖 <strong style={{ color: 'var(--primary-color)' }}>AI Multimodal sẽ tự động phân tích file Đáp án</strong> để tạo ra tiêu chí chấm điểm (rubric).
+            Hệ thống hỗ trợ <strong>file PDF</strong> hoặc <strong>Hình ảnh (.png, .jpg, .jpeg)</strong> gồm cả chữ viết, công thức và hình vẽ.
           </div>
 
           <div className="form-group" style={{ background: 'var(--input-bg)', padding: '1.25rem', borderRadius: '0.75rem', border: '1px solid var(--border-color)' }}>
             <label style={{ marginBottom: '0.5rem', display: 'block' }}>
-              📋 Upload Question File (PDF) <span style={{ color: 'red' }}>*</span>
+              📋 Upload Question File (PDF / Ảnh) <span style={{ color: 'red' }}>*</span>
             </label>
             <input
               id="questionFileInput"
               type="file"
-              accept="application/pdf"
+              accept="application/pdf,image/png,image/jpeg,image/jpg"
               className="form-control"
               onChange={(e) => setCurrentQuestionFile(e.target.files[0])}
               style={{ marginBottom: '1.25rem' }}
@@ -168,7 +168,7 @@ const LessonUpload = () => {
             />
 
             <label style={{ marginBottom: '0.5rem', display: 'block' }}>
-              ✅ Upload Answer / Solution File (PDF) <span style={{ color: 'red' }}>*</span>
+              ✅ Upload Answer / Solution File (PDF / Ảnh) <span style={{ color: 'red' }}>*</span>
               <span style={{ fontSize: '0.8rem', color: 'var(--primary-color)', marginLeft: '0.5rem' }}>
                 — AI sẽ đọc file này để tạo rubric
               </span>
@@ -176,7 +176,7 @@ const LessonUpload = () => {
             <input
               id="solutionFileInput"
               type="file"
-              accept="application/pdf"
+              accept="application/pdf,image/png,image/jpeg,image/jpg"
               className="form-control"
               onChange={(e) => setCurrentSolutionFile(e.target.files[0])}
               required
