@@ -48,8 +48,6 @@ public class LessonServiceImpl implements LessonService {
             String title,
             String category,
             String contentText,
-            String contentLatex,
-            String solutionSteps,
             Long providerId,
             MultipartFile materialFile,
             MultipartFile questionFile,
@@ -79,8 +77,6 @@ public class LessonServiceImpl implements LessonService {
         lesson.setTitle(title);
         lesson.setCategory(category);
         lesson.setContentText(contentText != null ? contentText : "");
-        lesson.setContentLatex(contentLatex != null ? contentLatex : "");
-        lesson.setSolutionSteps(solutionSteps != null ? solutionSteps : "");
         lesson.setProvider(provider);
 
         try {
@@ -164,7 +160,18 @@ public class LessonServiceImpl implements LessonService {
     @Override
     public org.springframework.http.ResponseEntity<org.springframework.core.io.Resource> downloadLessonFile(Long lessonId, String type) {
         Lesson lesson = getLessonById(lessonId);
-        String fileUrl = "solution".equalsIgnoreCase(type) ? lesson.getSolutionFileUrl() : lesson.getQuestionFileUrl();
+        String fileUrl;
+        String typeSuffix;
+        if ("solution".equalsIgnoreCase(type)) {
+            fileUrl = lesson.getSolutionFileUrl();
+            typeSuffix = "Dap_An";
+        } else if ("material".equalsIgnoreCase(type)) {
+            fileUrl = lesson.getMaterialFileUrl();
+            typeSuffix = "Tai_Lieu";
+        } else {
+            fileUrl = lesson.getQuestionFileUrl();
+            typeSuffix = "De_Bai";
+        }
 
         if (fileUrl == null || fileUrl.trim().isEmpty()) {
             throw new AppException(ErrorCode.LESSON_NOT_FOUND, "Không tìm thấy file tài liệu cho bài học này");
@@ -197,8 +204,7 @@ public class LessonServiceImpl implements LessonService {
                 mediaType = org.springframework.http.MediaType.IMAGE_JPEG;
             }
 
-            String suffix = ("solution".equalsIgnoreCase(type) ? "Dap_An" : "De_Bai") + ext;
-            String filename = sanitizedTitle + "_" + suffix;
+            String filename = sanitizedTitle + "_" + typeSuffix + ext;
 
             org.springframework.core.io.ByteArrayResource resource = new org.springframework.core.io.ByteArrayResource(fileBytes);
 

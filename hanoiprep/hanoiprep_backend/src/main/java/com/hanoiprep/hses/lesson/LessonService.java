@@ -11,8 +11,6 @@ public interface LessonService {
             String title,
             String category,
             String contentText,
-            String contentLatex,
-            String solutionSteps,
             Long providerId,
             MultipartFile materialFile,
             MultipartFile questionFile,

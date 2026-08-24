@@ -26,7 +26,6 @@ public class Submission {
     @JoinColumn(name = "lesson_id")
     private Lesson lesson;
 
-    private String imageUrl; // legacy?
     private String answerFileUrl;
 
     @Column(columnDefinition = "NVARCHAR(MAX)")

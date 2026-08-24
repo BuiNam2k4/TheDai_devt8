@@ -116,11 +116,9 @@ public class RubricExtractionService {
             }
         }
 
-        // 2. Nếu không có file hoặc không tải được, dùng solutionSteps hoặc contentText
+        // 2. Nếu không có file hoặc không tải được, dùng contentText
         if ((fileBytes == null || fileBytes.length == 0) && (solutionText == null || solutionText.isBlank())) {
-            if (lesson.getSolutionSteps() != null && !lesson.getSolutionSteps().isBlank()) {
-                solutionText = lesson.getSolutionSteps();
-            } else if (lesson.getContentText() != null && !lesson.getContentText().isBlank()) {
+            if (lesson.getContentText() != null && !lesson.getContentText().isBlank()) {
                 solutionText = lesson.getContentText();
             } else {
                 solutionText = "Bài tập " + (lesson.getTitle() != null ? lesson.getTitle() : "");
