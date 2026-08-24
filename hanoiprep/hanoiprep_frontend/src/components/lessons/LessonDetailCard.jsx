@@ -13,14 +13,27 @@ const LessonDetailCard = ({ selectedLesson, currentUser }) => {
       .replace(/[^a-zA-Z0-9\s_-]/g, '')
       .trim()
       .replace(/\s+/g, '_');
-    const filename = `${safeTitle}_${fallbackType}.pdf`;
+    
+    let backendType = 'question';
+    let fileSuffix = 'De_Bai';
+    if (fallbackType === 'DapAn') {
+      backendType = 'solution';
+      fileSuffix = 'Dap_An';
+    } else if (fallbackType === 'TaiLieu') {
+      backendType = 'material';
+      fileSuffix = 'Tai_Lieu';
+    }
+
+    const isImage = url.toLowerCase().match(/\.(png|jpg|jpeg)$/);
+    const ext = isImage ? (url.toLowerCase().endsWith('.png') ? '.png' : '.jpg') : '.pdf';
+    const filename = `${safeTitle}_${fileSuffix}${ext}`;
 
     try {
       // 1. Thử fetch trực tiếp qua blob
       const response = await fetch(url);
       if (!response.ok) throw new Error('Fetch failed');
       const blob = await response.blob();
-      const blobUrl = window.URL.createObjectURL(new Blob([blob], { type: 'application/pdf' }));
+      const blobUrl = window.URL.createObjectURL(new Blob([blob], { type: isImage ? `image/${ext.replace('.', '')}` : 'application/pdf' }));
       const link = document.createElement('a');
       link.href = blobUrl;
       link.setAttribute('download', filename);
@@ -30,8 +43,7 @@ const LessonDetailCard = ({ selectedLesson, currentUser }) => {
       window.URL.revokeObjectURL(blobUrl);
     } catch (error) {
       console.warn("Direct blob fetch failed, falling back to backend download proxy:", error);
-      // 2. Fallback qua endpoint backend để đảm bảo 100% tải đúng file .pdf không mã hóa
-      const backendType = fallbackType === 'DapAn' ? 'solution' : 'question';
+      // 2. Fallback qua endpoint backend
       const backendDownloadUrl = `http://localhost:8080/api/lessons/${selectedLesson.id}/download/${backendType}`;
       
       const link = document.createElement('a');
@@ -44,6 +56,9 @@ const LessonDetailCard = ({ selectedLesson, currentUser }) => {
       setDownloading(false);
     }
   };
+
+  const hasAnyFile = selectedLesson.materialFileUrl || selectedLesson.questionFileUrl || 
+    (selectedLesson.solutionFileUrl && (currentUser?.role === 'ROLE_COURSE_PROVIDER' || currentUser?.role === 'ROLE_ADMIN'));
 
   return (
     <div
@@ -97,69 +112,96 @@ const LessonDetailCard = ({ selectedLesson, currentUser }) => {
         )}
       </div>
 
-      {/* Các liên kết Tải Đề Bài và Tải Đáp Án */}
-      <div
-        style={{
-          background: 'var(--input-bg)',
-          padding: '1rem 1.25rem',
-          borderRadius: '0.75rem',
-          borderLeft: '4px solid var(--primary-color)',
-          border: '1px solid var(--border-color)',
-          marginTop: '1.25rem',
-        }}
-      >
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-          {/* Tải Đề Bài */}
-          {selectedLesson.questionFileUrl && (
-            <div>
-              <a
-                href="#"
-                onClick={(e) => {
-                  e.preventDefault();
-                  handleDownload(selectedLesson.questionFileUrl, 'DeBai');
-                }}
-                style={{
-                  color: '#10b981',
-                  textDecoration: 'underline',
-                  fontSize: '0.95rem',
-                  fontWeight: '600',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '0.35rem',
-                  cursor: downloading ? 'wait' : 'pointer',
-                }}
-              >
-                <span>📎</span> Tải Đề Bài (PDF)
-              </a>
-            </div>
-          )}
+      {/* Các liên kết Tải Đề Bài, Tài Liệu và Đáp Án */}
+      {hasAnyFile && (
+        <div
+          style={{
+            background: 'var(--input-bg)',
+            padding: '1rem 1.25rem',
+            borderRadius: '0.75rem',
+            borderLeft: '4px solid var(--primary-color)',
+            border: '1px solid var(--border-color)',
+            marginTop: '1.25rem',
+          }}
+        >
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+            {/* Tải Tài Liệu Học Tập (Dành cho Learner & Provider) */}
+            {selectedLesson.materialFileUrl && (
+              <div>
+                <a
+                  href="#"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    handleDownload(selectedLesson.materialFileUrl, 'TaiLieu');
+                  }}
+                  style={{
+                    color: 'var(--primary-color)',
+                    textDecoration: 'underline',
+                    fontSize: '0.95rem',
+                    fontWeight: '600',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '0.35rem',
+                    cursor: downloading ? 'wait' : 'pointer',
+                  }}
+                >
+                  <span>📘</span> Tải Tài Liệu Học Tập (PDF)
+                </a>
+              </div>
+            )}
 
-          {/* Tải Đáp Án / Hướng Dẫn Giải */}
-          {selectedLesson.solutionFileUrl && (currentUser?.role === 'ROLE_COURSE_PROVIDER' || currentUser?.role === 'ROLE_ADMIN') && (
-            <div>
-              <a
-                href="#"
-                onClick={(e) => {
-                  e.preventDefault();
-                  handleDownload(selectedLesson.solutionFileUrl, 'DapAn');
-                }}
-                style={{
-                  color: '#10b981',
-                  textDecoration: 'underline',
-                  fontSize: '0.95rem',
-                  fontWeight: '600',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '0.35rem',
-                  cursor: downloading ? 'wait' : 'pointer',
-                }}
-              >
-                <span>📎</span> Tải Đáp Án / Hướng Dẫn Giải (Dành cho Provider)
-              </a>
-            </div>
-          )}
+            {/* Tải Đề Bài (Dành cho Learner & Provider) */}
+            {selectedLesson.questionFileUrl && (
+              <div>
+                <a
+                  href="#"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    handleDownload(selectedLesson.questionFileUrl, 'DeBai');
+                  }}
+                  style={{
+                    color: '#10b981',
+                    textDecoration: 'underline',
+                    fontSize: '0.95rem',
+                    fontWeight: '600',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '0.35rem',
+                    cursor: downloading ? 'wait' : 'pointer',
+                  }}
+                >
+                  <span>📝</span> Tải Đề Bài (PDF)
+                </a>
+              </div>
+            )}
+
+            {/* Tải Đáp Án / Hướng Dẫn Giải (Chỉ Provider / Admin) */}
+            {selectedLesson.solutionFileUrl && (currentUser?.role === 'ROLE_COURSE_PROVIDER' || currentUser?.role === 'ROLE_ADMIN') && (
+              <div>
+                <a
+                  href="#"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    handleDownload(selectedLesson.solutionFileUrl, 'DapAn');
+                  }}
+                  style={{
+                    color: '#f59e0b',
+                    textDecoration: 'underline',
+                    fontSize: '0.95rem',
+                    fontWeight: '600',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '0.35rem',
+                    cursor: downloading ? 'wait' : 'pointer',
+                  }}
+                >
+                  <span>🔑</span> Tải Đáp Án / Hướng Dẫn Giải (Dành cho Provider)
+                </a>
+              </div>
+            )}
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 };
