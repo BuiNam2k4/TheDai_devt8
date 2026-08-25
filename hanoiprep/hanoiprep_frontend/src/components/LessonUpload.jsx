@@ -1,10 +1,12 @@
-import React, { useState, useContext } from 'react';
+import React, { useState, useContext, useEffect } from 'react';
 import axios from 'axios';
+import { useNavigate } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
 import authHeader from '../services/auth-header';
 
 const LessonUpload = () => {
   const { currentUser } = useContext(AuthContext);
+  const navigate = useNavigate();
   const [lessonTitle, setLessonTitle] = useState('');
   const [lessonDescription, setLessonDescription] = useState('');
   const [currentQuestionFile, setCurrentQuestionFile] = useState(null);
@@ -12,6 +14,21 @@ const LessonUpload = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [result, setResult] = useState(null); // { rubricCount, rubricStatus }
   const [uploadError, setUploadError] = useState('');
+
+  useEffect(() => {
+    if (!currentUser) {
+      navigate('/login');
+      return;
+    }
+    if (currentUser.role === 'ROLE_ADMIN') {
+      navigate('/admin/users');
+      return;
+    }
+    if (currentUser.role !== 'ROLE_COURSE_PROVIDER') {
+      navigate('/learner/lessons');
+      return;
+    }
+  }, [currentUser, navigate]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();

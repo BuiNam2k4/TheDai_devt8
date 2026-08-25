@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useContext } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { AuthContext } from '../context/AuthContext';
 import authHeader from '../services/auth-header';
@@ -14,6 +14,7 @@ const ITEMS_PER_PAGE = 5;
 
 const CourseProviderFeedbacks = () => {
   const { currentUser } = useContext(AuthContext);
+  const navigate = useNavigate();
   const [feedbacks, setFeedbacks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -22,8 +23,20 @@ const CourseProviderFeedbacks = () => {
   const [currentPage, setCurrentPage] = useState(1);
 
   useEffect(() => {
+    if (!currentUser) {
+      navigate('/login');
+      return;
+    }
+    if (currentUser.role === 'ROLE_ADMIN') {
+      navigate('/admin/users');
+      return;
+    }
+    if (currentUser.role !== 'ROLE_COURSE_PROVIDER') {
+      navigate('/learner/lessons');
+      return;
+    }
     fetchFeedbacks();
-  }, [currentUser]);
+  }, [currentUser, navigate]);
 
   const fetchFeedbacks = async () => {
     if (!currentUser) return;

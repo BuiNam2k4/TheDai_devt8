@@ -26,7 +26,7 @@ const Navbar = () => {
     <nav className="navbar">
       <div className="navbar-container" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '2rem' }}>
         {/* Cột Trái: Logo */}
-        <Link to="/" className="navbar-logo" style={{ textDecoration: 'none', flexShrink: 0 }}>
+        <Link to={currentUser?.role === "ROLE_ADMIN" ? "/admin/users" : "/"} className="navbar-logo" style={{ textDecoration: 'none', flexShrink: 0 }}>
           HanoiPrep
         </Link>
 
@@ -39,37 +39,39 @@ const Navbar = () => {
           flex: 1,
           flexWrap: 'wrap'
         }}>
-          <Link to="/" style={getLinkStyle('/')}>
-            Home
-          </Link>
-
-          {currentUser?.role === "ROLE_ADMIN" && (
+          {currentUser?.role === "ROLE_ADMIN" ? (
             <Link to="/admin/users" style={getLinkStyle('/admin/users')}>
               User Management
             </Link>
-          )}
-
-          {currentUser?.role === "ROLE_COURSE_PROVIDER" && (
+          ) : (
             <>
-              <Link to="/provider/lessons/upload" style={getLinkStyle('/provider/lessons/upload')}>
-                Create Lesson
+              <Link to="/" style={getLinkStyle('/')}>
+                Home
               </Link>
-              <Link to="/provider/feedbacks" style={getLinkStyle('/provider/feedbacks')}>
-                Feedbacks
-              </Link>
+
+              {currentUser?.role === "ROLE_COURSE_PROVIDER" && (
+                <>
+                  <Link to="/provider/lessons/upload" style={getLinkStyle('/provider/lessons/upload')}>
+                    Create Lesson
+                  </Link>
+                  <Link to="/provider/feedbacks" style={getLinkStyle('/provider/feedbacks')}>
+                    Feedbacks
+                  </Link>
+                </>
+              )}
+
+              {(currentUser?.role === "ROLE_LEARNER" || currentUser?.role === "ROLE_COURSE_PROVIDER") && (
+                <Link to="/learner/lessons" style={getLinkStyle('/learner/lessons')}>
+                  Lessons
+                </Link>
+              )}
+
+              {currentUser?.role === "ROLE_LEARNER" && (
+                <Link to="/learner/history" style={getLinkStyle('/learner/history')}>
+                  Lịch Sử & Điểm Số
+                </Link>
+              )}
             </>
-          )}
-
-          {(currentUser?.role === "ROLE_LEARNER" || currentUser?.role === "ROLE_COURSE_PROVIDER") && (
-            <Link to="/learner/lessons" style={getLinkStyle('/learner/lessons')}>
-              Lessons
-            </Link>
-          )}
-
-          {currentUser?.role === "ROLE_LEARNER" && (
-            <Link to="/learner/history" style={getLinkStyle('/learner/history')}>
-              Lịch Sử & Điểm Số
-            </Link>
           )}
         </div>
 

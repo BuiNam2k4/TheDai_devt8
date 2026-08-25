@@ -21,8 +21,12 @@ const LessonView = () => {
   const [answerText, setAnswerText] = useState('');
 
   useEffect(() => {
+    if (currentUser?.role === 'ROLE_ADMIN') {
+      navigate('/admin/users');
+      return;
+    }
     fetchLessons();
-  }, []);
+  }, [currentUser, navigate]);
 
   const fetchLessons = async () => {
     try {

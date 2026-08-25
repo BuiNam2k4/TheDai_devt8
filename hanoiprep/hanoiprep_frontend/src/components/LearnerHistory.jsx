@@ -39,8 +39,12 @@ const LearnerHistory = () => {
       navigate('/login');
       return;
     }
+    if (currentUser.role === 'ROLE_ADMIN') {
+      navigate('/admin/users');
+      return;
+    }
     fetchHistory();
-  }, [currentUser]);
+  }, [currentUser, navigate]);
 
   // Reset về trang 1 khi đổi bộ lọc hoặc chế độ xem
   useEffect(() => {
