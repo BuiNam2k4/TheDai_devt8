@@ -10,7 +10,7 @@ import LessonGroupCard from './history/LessonGroupCard';
 import TimelineItemCard from './history/TimelineItemCard';
 import PaginationBar from './history/PaginationBar';
 
-const ITEMS_PER_PAGE = 10;
+const ITEMS_PER_PAGE = 5;
 
 const LearnerHistory = () => {
   const { currentUser } = useContext(AuthContext);

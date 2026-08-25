@@ -61,6 +61,25 @@ public class RubricExtractionService {
     }
 
     /**
+     * Tái sử dụng trực tiếp text đáp án đã được OCR và chuẩn hóa từ bước kiểm tra nhất quán
+     */
+    @Transactional
+    public List<Rubric> extractAndSaveRubricsFromText(Lesson lesson, String solutionText) {
+        if (solutionText == null || solutionText.isBlank()) {
+            return extractAndSaveRubricsFromLessonEntity(lesson);
+        }
+        try {
+            log.info("Sinh rubrics trực tiếp từ text đáp án đã chuẩn hóa sẵn ({} ký tự) cho lesson {}...",
+                    solutionText.length(), lesson.getId());
+            List<RubricDto> rubricDtos = callGeminiForRubrics(lesson, solutionText, null, null);
+            return saveRubrics(lesson, rubricDtos);
+        } catch (Exception e) {
+            log.error("Sinh rubric từ text đáp án thất bại cho lesson {}: {}", lesson.getId(), e.getMessage());
+            return createDefaultRubric(lesson);
+        }
+    }
+
+    /**
      * Trích xuất text hoặc gửi PDF binary sang Gemini Multimodal, lưu rubrics cho
      * lesson.
      */

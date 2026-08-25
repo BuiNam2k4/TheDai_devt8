@@ -1,8 +1,27 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import PaginationBar from '../history/PaginationBar';
+
+const ITEMS_PER_PAGE = 5;
 
 const LessonProviderSubmissions = ({ submissions, lessonFeedbacks }) => {
   const navigate = useNavigate();
+  const [subPage, setSubPage] = useState(1);
+  const [fbPage, setFbPage] = useState(1);
+
+  // Phân trang bài nộp (5 bài / trang)
+  const totalSubPages = Math.ceil(submissions.length / ITEMS_PER_PAGE) || 1;
+  const pagedSubmissions = submissions.slice(
+    (subPage - 1) * ITEMS_PER_PAGE,
+    subPage * ITEMS_PER_PAGE
+  );
+
+  // Phân trang phản hồi (5 phản hồi / trang)
+  const totalFbPages = Math.ceil(lessonFeedbacks.length / ITEMS_PER_PAGE) || 1;
+  const pagedFeedbacks = lessonFeedbacks.slice(
+    (fbPage - 1) * ITEMS_PER_PAGE,
+    fbPage * ITEMS_PER_PAGE
+  );
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
@@ -25,61 +44,70 @@ const LessonProviderSubmissions = ({ submissions, lessonFeedbacks }) => {
             Chưa có học viên nào nộp bài cho bài học này.
           </p>
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-            {submissions.map((sub) => (
-              <div
-                key={sub.id}
-                style={{
-                  background: 'var(--input-bg)',
-                  border: '1px solid var(--border-color)',
-                  borderRadius: '0.6rem',
-                  padding: '0.85rem 1.25rem',
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  flexWrap: 'wrap',
-                  gap: '0.75rem',
-                }}
-              >
-                <div>
-                  <span style={{ fontWeight: '700', color: 'var(--text-main)', fontSize: '0.95rem' }}>
-                    👤 {sub.user?.username || 'Học viên #' + sub.userId}
-                  </span>
-                  <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '2px' }}>
-                    🕒 Nộp lúc: {sub.createdAt ? new Date(sub.createdAt).toLocaleString('vi-VN') : 'N/A'}
+          <>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+              {pagedSubmissions.map((sub) => (
+                <div
+                  key={sub.id}
+                  style={{
+                    background: 'var(--input-bg)',
+                    border: '1px solid var(--border-color)',
+                    borderRadius: '0.6rem',
+                    padding: '0.85rem 1.25rem',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    flexWrap: 'wrap',
+                    gap: '0.75rem',
+                  }}
+                >
+                  <div>
+                    <span style={{ fontWeight: '700', color: 'var(--text-main)', fontSize: '0.95rem' }}>
+                      👤 {sub.user?.username || 'Học viên #' + sub.userId}
+                    </span>
+                    <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '2px' }}>
+                      🕒 Nộp lúc: {sub.createdAt ? new Date(sub.createdAt).toLocaleString('vi-VN') : 'N/A'}
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                    {sub.status === 'GRADED' ? (
+                      <span style={{ fontWeight: '800', color: '#10b981', fontSize: '1.1rem' }}>
+                        {sub.totalScore != null ? sub.totalScore.toFixed(1) : 'N/A'} <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>/ 10</span>
+                      </span>
+                    ) : (
+                      <span style={{ fontSize: '0.8rem', color: '#f59e0b', fontWeight: '600' }}>
+                        Đang chấm AI...
+                      </span>
+                    )}
+
+                    <button
+                      onClick={() => navigate(`/submission/${sub.id}/result`)}
+                      style={{
+                        background: 'rgba(99, 102, 241, 0.15)',
+                        color: 'var(--primary-color)',
+                        border: '1px solid rgba(99, 102, 241, 0.3)',
+                        padding: '0.4rem 0.85rem',
+                        borderRadius: '0.4rem',
+                        fontWeight: '600',
+                        fontSize: '0.8rem',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      🔍 Xem kết quả
+                    </button>
                   </div>
                 </div>
+              ))}
+            </div>
 
-                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                  {sub.status === 'GRADED' ? (
-                    <span style={{ fontWeight: '800', color: '#10b981', fontSize: '1.1rem' }}>
-                      {sub.totalScore != null ? sub.totalScore.toFixed(1) : 'N/A'} <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>/ 10</span>
-                    </span>
-                  ) : (
-                    <span style={{ fontSize: '0.8rem', color: '#f59e0b', fontWeight: '600' }}>
-                      Đang chấm AI...
-                    </span>
-                  )}
-
-                  <button
-                    onClick={() => navigate(`/submission/${sub.id}/result`)}
-                    style={{
-                      background: 'rgba(99, 102, 241, 0.15)',
-                      color: 'var(--primary-color)',
-                      border: '1px solid rgba(99, 102, 241, 0.3)',
-                      padding: '0.4rem 0.85rem',
-                      borderRadius: '0.4rem',
-                      fontWeight: '600',
-                      fontSize: '0.8rem',
-                      cursor: 'pointer',
-                    }}
-                  >
-                    🔍 Xem kết quả
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
+            {/* Phân trang bài nộp */}
+            <PaginationBar
+              currentPage={subPage}
+              setCurrentPage={setSubPage}
+              totalCurrentPages={totalSubPages}
+            />
+          </>
         )}
       </div>
 
@@ -98,7 +126,7 @@ const LessonProviderSubmissions = ({ submissions, lessonFeedbacks }) => {
             <span>💬</span> Phản Hồi / Báo Lỗi ({lessonFeedbacks.length})
           </h3>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-            {lessonFeedbacks.map((fb) => (
+            {pagedFeedbacks.map((fb) => (
               <div
                 key={fb.id}
                 style={{
@@ -122,6 +150,13 @@ const LessonProviderSubmissions = ({ submissions, lessonFeedbacks }) => {
               </div>
             ))}
           </div>
+
+          {/* Phân trang phản hồi */}
+          <PaginationBar
+            currentPage={fbPage}
+            setCurrentPage={setFbPage}
+            totalCurrentPages={totalFbPages}
+          />
         </div>
       )}
     </div>

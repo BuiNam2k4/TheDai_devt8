@@ -11,6 +11,7 @@ const LessonUpload = () => {
   const [currentSolutionFile, setCurrentSolutionFile] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [result, setResult] = useState(null); // { rubricCount, rubricStatus }
+  const [uploadError, setUploadError] = useState('');
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -39,6 +40,7 @@ const LessonUpload = () => {
 
     setIsSubmitting(true);
     setResult(null);
+    setUploadError('');
 
     try {
       const lessonFormData = new FormData();
@@ -72,9 +74,16 @@ const LessonUpload = () => {
       document.getElementById('solutionFileInput').value = '';
     } catch (error) {
       console.error(error);
-      const errorData = error.response?.data;
-      const errorMessage = typeof errorData === 'object' ? JSON.stringify(errorData) : (errorData || error.message);
-      alert('Error uploading lesson: ' + errorMessage);
+      const errRes = error.response?.data;
+      let msg = 'Lỗi không xác định khi tạo bài học.';
+      if (typeof errRes === 'string') {
+        msg = errRes;
+      } else if (errRes?.message) {
+        msg = errRes.message;
+      } else if (error.message) {
+        msg = error.message;
+      }
+      setUploadError(msg);
     } finally {
       setIsSubmitting(false);
     }
@@ -83,7 +92,41 @@ const LessonUpload = () => {
   return (
     <div className="admin-container">
       <div className="admin-card">
-        <h2 className="admin-title">Upload Lesson</h2>
+        <div style={{ marginBottom: '1.75rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '1.25rem' }}>
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', background: 'rgba(99, 102, 241, 0.15)', border: '1px solid rgba(99, 102, 241, 0.3)', padding: '3px 10px', borderRadius: '99px', fontSize: '0.75rem', fontWeight: 600, color: '#a5b4fc', marginBottom: '0.5rem' }}>
+            🤖 AI Pre-Validation & Automated Rubrics
+          </div>
+          <h2 style={{ fontSize: '1.6rem', fontWeight: 800, margin: '0 0 0.4rem 0', color: 'var(--text-main)' }}>
+            ✨ Tạo & Tải Lên Bài Học Mới
+          </h2>
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', margin: 0, lineHeight: 1.5 }}>
+            Hệ thống sẽ tự động thẩm định tính đồng nhất giữa Đề bài & Đáp án trước khi lưu vào Database, đồng thời tự động bóc tách barem chấm điểm chi tiết.
+          </p>
+        </div>
+
+        {/* Error alert */}
+        {uploadError && (
+          <div style={{
+            background: 'rgba(239, 68, 68, 0.1)',
+            border: '1px solid #ef4444',
+            borderRadius: '0.75rem',
+            padding: '1.25rem',
+            marginBottom: '1.5rem',
+            display: 'flex',
+            alignItems: 'flex-start',
+            gap: '0.75rem'
+          }}>
+            <span style={{ fontSize: '1.5rem', lineHeight: 1 }}>⚠️</span>
+            <div>
+              <p style={{ color: '#ef4444', fontWeight: 700, margin: '0 0 0.35rem 0', fontSize: '1rem' }}>
+                Từ chối lưu bài học do tài liệu không hợp lệ:
+              </p>
+              <p style={{ color: 'var(--text-main)', fontSize: '0.9rem', margin: 0, lineHeight: 1.5 }}>
+                {uploadError}
+              </p>
+            </div>
+          </div>
+        )}
 
         {/* Success result */}
         {result && (
