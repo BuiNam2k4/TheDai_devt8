@@ -52,8 +52,7 @@ public class LessonServiceImpl implements LessonService {
             Long providerId,
             MultipartFile materialFile,
             MultipartFile questionFile,
-            MultipartFile solutionFile
-    ) {
+            MultipartFile solutionFile) {
         User provider = userRepository.findById(providerId)
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND, "Provider không tồn tại"));
 
@@ -62,9 +61,10 @@ public class LessonServiceImpl implements LessonService {
         validateAllowedFile(questionFile, "Đề bài");
         validateAllowedFile(solutionFile, "Đáp án");
 
-        // 0. Thẩm định tính nhất quán và tương ứng giữa các tệp tin (Đề bài vs Đáp án vs Tài liệu)
-        com.hanoiprep.hses.lesson.validation.DocumentValidationResult validationResult =
-                documentConsistencyValidator.validate(materialFile, questionFile, solutionFile);
+        // 0. Thẩm định tính nhất quán và tương ứng giữa các tệp tin (Đề bài vs Đáp án
+        // vs Tài liệu)
+        com.hanoiprep.hses.lesson.validation.DocumentValidationResult validationResult = documentConsistencyValidator
+                .validate(materialFile, questionFile, solutionFile);
 
         if (!validationResult.isValid()) {
             log.warn("Từ chối lưu bài học do tài liệu không nhất quán: {}", validationResult.getReason());
@@ -105,14 +105,16 @@ public class LessonServiceImpl implements LessonService {
 
         Lesson savedLesson = lessonRepository.save(lesson);
 
-        // 2. AI tự sinh Rubric (Tái sử dụng trực tiếp text đáp án đã OCR và chuẩn hóa từ bước kiểm tra nhất quán)
+        // 2. AI tự sinh Rubric (Tái sử dụng trực tiếp text đáp án đã OCR và chuẩn hóa
+        // từ bước kiểm tra nhất quán)
         int rubricCount = 0;
         String rubricStatus = "no_solution_file";
 
         String preExtractedSolutionText = validationResult.getExtractedSolutionText();
         if (preExtractedSolutionText != null && !preExtractedSolutionText.isBlank()) {
             try {
-                var rubrics = rubricExtractionService.extractAndSaveRubricsFromText(savedLesson, preExtractedSolutionText);
+                var rubrics = rubricExtractionService.extractAndSaveRubricsFromText(savedLesson,
+                        preExtractedSolutionText);
                 rubricCount = rubrics.size();
                 rubricStatus = "auto_generated";
             } catch (Exception e) {
@@ -131,7 +133,8 @@ public class LessonServiceImpl implements LessonService {
     }
 
     private void validateAllowedFile(MultipartFile file, String fieldName) {
-        if (file == null || file.isEmpty()) return;
+        if (file == null || file.isEmpty())
+            return;
         String filename = file.getOriginalFilename();
         if (filename == null || filename.isBlank()) {
             throw new AppException(ErrorCode.INVALID_INPUT, "Tệp tin " + fieldName + " không hợp lệ.");
@@ -139,20 +142,25 @@ public class LessonServiceImpl implements LessonService {
         String lower = filename.toLowerCase();
         if (!lower.endsWith(".pdf") && !lower.endsWith(".png") && !lower.endsWith(".jpg") && !lower.endsWith(".jpeg")) {
             throw new AppException(ErrorCode.INVALID_INPUT,
-                    "Tệp tin " + fieldName + " không hợp lệ ('" + filename + "'). Hệ thống chỉ cho phép nộp file định dạng PDF (.pdf) hoặc Hình ảnh (.png, .jpg, .jpeg).");
+                    "Tệp tin " + fieldName + " không hợp lệ ('" + filename
+                            + "'). Hệ thống chỉ cho phép nộp file định dạng PDF (.pdf) hoặc Hình ảnh (.png, .jpg, .jpeg).");
         }
     }
 
     private String detectMimeType(String filename) {
-        if (filename == null) return "application/pdf";
+        if (filename == null)
+            return "application/pdf";
         String lower = filename.toLowerCase();
-        if (lower.endsWith(".png")) return "image/png";
-        if (lower.endsWith(".jpg") || lower.endsWith(".jpeg")) return "image/jpeg";
+        if (lower.endsWith(".png"))
+            return "image/png";
+        if (lower.endsWith(".jpg") || lower.endsWith(".jpeg"))
+            return "image/jpeg";
         return "application/pdf";
     }
 
     @Override
-    public org.springframework.http.ResponseEntity<org.springframework.core.io.Resource> downloadLessonFile(Long lessonId, String type) {
+    public org.springframework.http.ResponseEntity<org.springframework.core.io.Resource> downloadLessonFile(
+            Long lessonId, String type) {
         Lesson lesson = getLessonById(lessonId);
         String fileUrl;
         String typeSuffix;
@@ -183,10 +191,11 @@ public class LessonServiceImpl implements LessonService {
                 fileBytes = java.nio.file.Files.readAllBytes(file.toPath());
             }
 
-            String sanitizedTitle = lesson.getTitle() != null 
-                    ? lesson.getTitle().replaceAll("[^a-zA-Z0-9\\u00C0-\\u1EF9\\s_-]", "").trim().replaceAll("\\s+", "_")
+            String sanitizedTitle = lesson.getTitle() != null
+                    ? lesson.getTitle().replaceAll("[^a-zA-Z0-9\\u00C0-\\u1EF9\\s_-]", "").trim().replaceAll("\\s+",
+                            "_")
                     : "bai_hoc";
-            
+
             String ext = ".pdf";
             org.springframework.http.MediaType mediaType = org.springframework.http.MediaType.APPLICATION_PDF;
             String lowerUrl = fileUrl.toLowerCase();
@@ -200,10 +209,12 @@ public class LessonServiceImpl implements LessonService {
 
             String filename = sanitizedTitle + "_" + typeSuffix + ext;
 
-            org.springframework.core.io.ByteArrayResource resource = new org.springframework.core.io.ByteArrayResource(fileBytes);
+            org.springframework.core.io.ByteArrayResource resource = new org.springframework.core.io.ByteArrayResource(
+                    fileBytes);
 
             return org.springframework.http.ResponseEntity.ok()
-                    .header(org.springframework.http.HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + filename + "\"")
+                    .header(org.springframework.http.HttpHeaders.CONTENT_DISPOSITION,
+                            "attachment; filename=\"" + filename + "\"")
                     .contentType(mediaType)
                     .contentLength(fileBytes.length)
                     .body(resource);
