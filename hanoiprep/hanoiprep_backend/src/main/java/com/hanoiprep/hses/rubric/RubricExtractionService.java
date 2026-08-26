@@ -4,6 +4,9 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.hanoiprep.hses.chatbot.GeminiService;
+import com.hanoiprep.hses.common.exception.AppException;
+import com.hanoiprep.hses.common.exception.ErrorCode;
+import com.hanoiprep.hses.common.util.AiJsonUtils;
 import com.hanoiprep.hses.lesson.Lesson;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
@@ -61,7 +64,8 @@ public class RubricExtractionService {
     }
 
     /**
-     * Tái sử dụng trực tiếp text đáp án đã được OCR và chuẩn hóa từ bước kiểm tra nhất quán
+     * Tái sử dụng trực tiếp text đáp án đã được OCR và chuẩn hóa từ bước kiểm tra
+     * nhất quán
      */
     @Transactional
     public List<Rubric> extractAndSaveRubricsFromText(Lesson lesson, String solutionText) {
@@ -73,9 +77,13 @@ public class RubricExtractionService {
                     solutionText.length(), lesson.getId());
             List<RubricDto> rubricDtos = callGeminiForRubrics(lesson, solutionText, null, null);
             return saveRubrics(lesson, rubricDtos);
+        } catch (AppException ae) {
+            throw ae;
         } catch (Exception e) {
             log.error("Sinh rubric từ text đáp án thất bại cho lesson {}: {}", lesson.getId(), e.getMessage());
-            return createDefaultRubric(lesson);
+            throw new AppException(ErrorCode.RUBRIC_EXTRACTION_FAILED,
+                    "Không thể tự động trích xuất Barem chấm điểm từ file đáp án: " + e.getMessage()
+                    + ". Vui lòng kiểm tra lại nội dung file đáp án (đảm bảo rõ ràng các câu, các bước giải và điểm số).");
         }
     }
 
@@ -99,20 +107,26 @@ public class RubricExtractionService {
                 pdfText = extractTextFromPdf(fileBytes);
             }
 
-            log.info("Processing solution file '{}' ({} bytes, mime: {}, {} extracted chars) for lesson {} via Gemini...",
+            log.info(
+                    "Processing solution file '{}' ({} bytes, mime: {}, {} extracted chars) for lesson {} via Gemini...",
                     originalName, fileBytes.length, mimeType, pdfText != null ? pdfText.length() : 0, lesson.getId());
 
             List<RubricDto> rubricDtos = callGeminiForRubrics(lesson, pdfText, fileBytes, mimeType);
 
             return saveRubrics(lesson, rubricDtos);
+        } catch (AppException ae) {
+            throw ae;
         } catch (Exception e) {
             log.error("Gemini rubric extraction failed for lesson {}: {}", lesson.getId(), e.getMessage());
-            return extractAndSaveRubricsFromLessonEntity(lesson);
+            throw new AppException(ErrorCode.RUBRIC_EXTRACTION_FAILED,
+                    "Không thể tự động trích xuất Barem chấm điểm từ file đáp án: " + e.getMessage()
+                    + ". Vui lòng kiểm tra lại nội dung file đáp án (đảm bảo rõ ràng các câu, các bước giải và điểm số).");
         }
     }
 
     /**
-     * Trích xuất từ Lesson entity (tải PDF/Ảnh từ Cloudinary hoặc dùng solutionSteps / contentText),
+     * Trích xuất từ Lesson entity (tải PDF/Ảnh từ Cloudinary hoặc dùng
+     * solutionSteps / contentText),
      * tự động sinh Rubrics mới từ AI và lưu vào DB.
      */
     @Transactional
@@ -147,7 +161,8 @@ public class RubricExtractionService {
         try {
             List<RubricDto> rubricDtos;
             if (fileBytes != null && fileBytes.length > 0) {
-                log.info("Calling Gemini Multimodal with Cloudinary file ({} bytes, mime: {}) for lesson {}...", fileBytes.length,
+                log.info("Calling Gemini Multimodal with Cloudinary file ({} bytes, mime: {}) for lesson {}...",
+                        fileBytes.length,
                         mimeType, lesson.getId());
                 rubricDtos = callGeminiForRubrics(lesson, solutionText, fileBytes, mimeType);
             } else {
@@ -156,17 +171,24 @@ public class RubricExtractionService {
                 rubricDtos = callGeminiForRubrics(lesson, solutionText, null, null);
             }
             return saveRubrics(lesson, rubricDtos);
+        } catch (AppException ae) {
+            throw ae;
         } catch (Exception e) {
-            log.error("Fallback rubric generation failed for lesson {}: {}", lesson.getId(), e.getMessage());
-            return createDefaultRubric(lesson);
+            log.error("Rubric generation failed for lesson {}: {}", lesson.getId(), e.getMessage());
+            throw new AppException(ErrorCode.RUBRIC_EXTRACTION_FAILED,
+                    "Không thể tự động trích xuất Barem chấm điểm cho bài học: " + e.getMessage()
+                    + ". Vui lòng kiểm tra lại nội dung đáp án.");
         }
     }
 
     private String resolveMimeType(String filename) {
-        if (filename == null) return "application/pdf";
+        if (filename == null)
+            return "application/pdf";
         String lower = filename.toLowerCase();
-        if (lower.endsWith(".png")) return "image/png";
-        if (lower.endsWith(".jpg") || lower.endsWith(".jpeg")) return "image/jpeg";
+        if (lower.endsWith(".png"))
+            return "image/png";
+        if (lower.endsWith(".jpg") || lower.endsWith(".jpeg"))
+            return "image/jpeg";
         return "application/pdf";
     }
 
@@ -196,7 +218,8 @@ public class RubricExtractionService {
     // ─────────────────────────────────────────────────────────────────────────
     // Bước 2: Gọi Gemini AI sinh rubrics chi tiết từ text hoặc PDF binary
     // ─────────────────────────────────────────────────────────────────────────
-    private List<RubricDto> callGeminiForRubrics(Lesson lesson, String textContent, byte[] mediaBytes, String mimeType) throws Exception {
+    private List<RubricDto> callGeminiForRubrics(Lesson lesson, String textContent, byte[] mediaBytes, String mimeType)
+            throws Exception {
         String lessonTitle = (lesson.getTitle() != null && !lesson.getTitle().isBlank())
                 ? lesson.getTitle()
                 : "Bài tập tự luận";
@@ -210,7 +233,8 @@ public class RubricExtractionService {
 
                         ## TÀI LIỆU ĐÍNH KÈM (PDF / HÌNH ẢNH):
                         Có đính kèm file gốc. Hãy đọc kết hợp cả văn bản trên và các hình ảnh, sơ đồ, đồ thị, bảng biểu trong tài liệu đính kèm để lập barem chuẩn xác.
-                        """.formatted(textContent);
+                        """
+                        .formatted(textContent);
             } else {
                 solutionSection = """
                         ## NỘI DUNG ĐÁP ÁN:
@@ -264,7 +288,8 @@ public class RubricExtractionService {
 
         String rawResponse;
         if (mediaBytes != null && mediaBytes.length > 0) {
-            rawResponse = geminiService.callGeminiWithMedia(prompt, mediaBytes, (mimeType != null && !mimeType.isBlank()) ? mimeType : "application/pdf");
+            rawResponse = geminiService.callGeminiWithMedia(prompt, mediaBytes,
+                    (mimeType != null && !mimeType.isBlank()) ? mimeType : "application/pdf");
         } else {
             rawResponse = geminiService.callGemini(prompt);
         }
@@ -348,74 +373,5 @@ public class RubricExtractionService {
         List<Rubric> saved = rubricRepository.saveAll(toSave);
         log.info("Saved {} new AI-extracted rubrics for lesson {}", saved.size(), lesson.getId());
         return saved;
-    }
-
-    // ─────────────────────────────────────────────────────────────────────────
-    // Fallback: tạo 1 rubric tổng khi không đọc được PDF hoặc AI lỗi
-    // ─────────────────────────────────────────────────────────────────────────
-    private List<Rubric> createDefaultRubric(Lesson lesson) {
-        try {
-            rubricRepository.deleteByLessonId(lesson.getId());
-        } catch (Exception ignored) {
-        }
-
-        Rubric rubric = Rubric.builder()
-                .lesson(lesson)
-                .questionNo("Câu 1")
-                .stepOrder(1)
-                .stepDescription("Đánh giá tổng thể bài làm dựa trên nội dung đáp án bài học")
-                .maxScore(10.0)
-                .expectedLogicKeyword("")
-                .build();
-        return List.of(rubricRepository.save(rubric));
-    }
-
-    private String extractJsonArray(String text) {
-        if (text == null)
-            return "[]";
-        text = text.trim();
-
-        // 1. Loại bỏ các khối markdown wrapper (```json ... ``` hoặc ``` ...)
-        if (text.startsWith("```json"))
-            text = text.substring(7);
-        else if (text.startsWith("```"))
-            text = text.substring(3);
-        if (text.endsWith("```"))
-            text = text.substring(0, text.length() - 3);
-        text = text.trim();
-
-        // 2. Tìm cặp ngoặc mảng JSON [...] ngoài cùng
-        int start = text.indexOf('[');
-        int end = text.lastIndexOf(']');
-        if (start != -1 && end != -1 && end > start) {
-            String candidate = text.substring(start, end + 1).trim();
-            // Loại bỏ dấu phẩy thừa trước ngoặc đóng (trailing comma) nếu có
-            candidate = candidate.replaceAll(",\\s*\\]", "]");
-            try {
-                objectMapper.readTree(candidate);
-                return candidate;
-            } catch (Exception ignored) {
-            }
-        }
-
-        // 3. Fallback: Regex trích xuất tất cả các đối tượng JSON {...} hoàn chỉnh hợp
-        // lệ
-        java.util.regex.Pattern pattern = java.util.regex.Pattern.compile("\\{[^{}]*\\}");
-        java.util.regex.Matcher matcher = pattern.matcher(text);
-        List<String> validObjects = new ArrayList<>();
-        while (matcher.find()) {
-            String objStr = matcher.group();
-            try {
-                objectMapper.readTree(objStr);
-                validObjects.add(objStr);
-            } catch (Exception ignored) {
-            }
-        }
-
-        if (!validObjects.isEmpty()) {
-            return "[" + String.join(",", validObjects) + "]";
-        }
-
-        return "[]";
     }
 }

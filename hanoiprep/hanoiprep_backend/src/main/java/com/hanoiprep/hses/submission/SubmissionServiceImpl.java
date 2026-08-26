@@ -44,9 +44,11 @@ public class SubmissionServiceImpl implements SubmissionService {
             String filename = answerFile.getOriginalFilename();
             if (filename != null) {
                 String lower = filename.toLowerCase();
-                if (!lower.endsWith(".pdf") && !lower.endsWith(".png") && !lower.endsWith(".jpg") && !lower.endsWith(".jpeg")) {
+                if (!lower.endsWith(".pdf") && !lower.endsWith(".png") && !lower.endsWith(".jpg")
+                        && !lower.endsWith(".jpeg")) {
                     throw new AppException(ErrorCode.INVALID_INPUT,
-                            "File bài nộp không hợp lệ ('" + filename + "'). Hệ thống chỉ chấp nhận file PDF (.pdf) hoặc Hình ảnh (.png, .jpg, .jpeg).");
+                            "File bài nộp không hợp lệ ('" + filename
+                                    + "'). Hệ thống chỉ chấp nhận file PDF (.pdf) hoặc Hình ảnh (.png, .jpg, .jpeg).");
                 }
             }
         }
@@ -72,7 +74,8 @@ public class SubmissionServiceImpl implements SubmissionService {
                         org.apache.pdfbox.text.PDFTextStripper stripper = new org.apache.pdfbox.text.PDFTextStripper();
                         String pdfText = stripper.getText(doc).trim();
                         if (!pdfText.isBlank()) {
-                            if (combinedAnswer.length() > 0) combinedAnswer.append("\n\n--- NỘI DUNG TỪ FILE PDF BÀI LÀM ---\n");
+                            if (combinedAnswer.length() > 0)
+                                combinedAnswer.append("\n\n--- NỘI DUNG TỪ FILE PDF BÀI LÀM ---\n");
                             combinedAnswer.append(pdfText);
                         }
                     } catch (Exception pdfEx) {

@@ -18,6 +18,7 @@ public enum ErrorCode {
     PASSWORD_NOT_MATCH(1009, "Mật khẩu xác nhận không khớp", HttpStatus.BAD_REQUEST),
     LESSON_NOT_FOUND(2001, "Không tìm thấy bài học", HttpStatus.NOT_FOUND),
     RUBRIC_NOT_FOUND(2002, "Không tìm thấy tiêu chí Barem", HttpStatus.NOT_FOUND),
+    RUBRIC_EXTRACTION_FAILED(2003, "Không thể tự động trích xuất Barem chấm điểm từ file đáp án", HttpStatus.BAD_REQUEST),
     SUBMISSION_NOT_FOUND(3001, "Không tìm thấy bài nộp", HttpStatus.NOT_FOUND),
     FEEDBACK_NOT_FOUND(4001, "Không tìm thấy phản hồi", HttpStatus.NOT_FOUND),
     FILE_UPLOAD_FAILED(5001, "Tải tệp tin lên thất bại", HttpStatus.INTERNAL_SERVER_ERROR),

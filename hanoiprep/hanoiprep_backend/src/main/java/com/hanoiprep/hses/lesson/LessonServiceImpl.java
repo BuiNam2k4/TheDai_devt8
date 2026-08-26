@@ -112,15 +112,10 @@ public class LessonServiceImpl implements LessonService {
 
         String preExtractedSolutionText = validationResult.getExtractedSolutionText();
         if (preExtractedSolutionText != null && !preExtractedSolutionText.isBlank()) {
-            try {
-                var rubrics = rubricExtractionService.extractAndSaveRubricsFromText(savedLesson,
-                        preExtractedSolutionText);
-                rubricCount = rubrics.size();
-                rubricStatus = "auto_generated";
-            } catch (Exception e) {
-                log.warn("Tự động trích xuất Rubric từ text chuẩn hóa thất bại: {}", e.getMessage());
-                rubricStatus = "extraction_failed: " + e.getMessage();
-            }
+            var rubrics = rubricExtractionService.extractAndSaveRubricsFromText(savedLesson,
+                    preExtractedSolutionText);
+            rubricCount = rubrics.size();
+            rubricStatus = "auto_generated";
         }
 
         // 3. Trả về response map

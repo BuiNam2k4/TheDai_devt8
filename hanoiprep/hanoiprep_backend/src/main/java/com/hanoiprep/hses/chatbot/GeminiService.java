@@ -29,24 +29,26 @@ public class GeminiService {
     @Value("${gemini.api.key}")
     private String apiKey;
 
-    // Các model hoạt động tốt nhất hiện tại trên Google GenerativeLanguage API v1beta
+    // Các model hoạt động tốt nhất hiện tại trên Google GenerativeLanguage API
+    // v1beta
     private static final List<String> MODEL_PRIORITY = List.of(
             "gemini-3.5-flash",
             "gemini-flash-latest",
             "gemini-3.6-flash",
-            "gemini-3.1-flash-lite"
-    );
+            "gemini-3.1-flash-lite");
 
     /** Số lần retry tối đa cho mỗi model khi gặp lỗi tạm thời */
     private static final int MAX_RETRIES = 3;
 
     public GeminiService() {
-        // Cấu hình timeout: 10s kết nối, 90s đọc (Gemini đôi khi cần ~60s cho prompt dài)
+        // Cấu hình timeout: 10s kết nối, 90s đọc (Gemini đôi khi cần ~60s cho prompt
+        // dài)
         SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
         factory.setConnectTimeout(10_000);
         factory.setReadTimeout(90_000);
         this.restTemplate = new RestTemplate(factory);
-        // CẤU HÌNH QUAN TRỌNG: Ép RestTemplate dùng UTF-8 để không bị lỗi chính tả/font tiếng Việt
+        // CẤU HÌNH QUAN TRỌNG: Ép RestTemplate dùng UTF-8 để không bị lỗi chính tả/font
+        // tiếng Việt
         this.restTemplate.getMessageConverters()
                 .add(0, new StringHttpMessageConverter(StandardCharsets.UTF_8));
         this.objectMapper = new ObjectMapper();
@@ -105,13 +107,15 @@ public class GeminiService {
                         return response.getBody();
                     }
                 } catch (org.springframework.web.client.HttpClientErrorException e) {
-                    // 401 Unauthorized = API key không hợp lệ → fail ngay, không retry, không thử model khác
+                    // 401 Unauthorized = API key không hợp lệ → fail ngay, không retry, không thử
+                    // model khác
                     if (e.getStatusCode().value() == 401) {
                         log.error("Gemini API key không hợp lệ hoặc chưa được cấp quyền (401 Unauthorized). "
                                 + "Vui lòng kiểm tra lại GEMINI_API_KEY trong file .env");
                         throw new RuntimeException(
                                 "Gemini API key không hợp lệ (401 Unauthorized). "
-                                + "Vui lòng cập nhật GEMINI_API_KEY hợp lệ trong file .env", e);
+                                        + "Vui lòng cập nhật GEMINI_API_KEY hợp lệ trong file .env",
+                                e);
                     }
                     log.warn("Gemini model [{}] attempt {}/{} thất bại (HTTP {}): {}",
                             model, attempt, MAX_RETRIES, e.getStatusCode().value(), e.getMessage());

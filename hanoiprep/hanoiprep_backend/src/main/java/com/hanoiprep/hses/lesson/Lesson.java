@@ -22,7 +22,7 @@ public class Lesson {
 
     @Column(columnDefinition = "NVARCHAR(255)")
     private String category;
-    
+
     @Column(columnDefinition = "NVARCHAR(MAX)")
     private String contentText;
 
@@ -46,4 +46,3 @@ public class Lesson {
     @OneToMany(mappedBy = "lesson", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<com.hanoiprep.hses.feedback.Feedback> feedbacks;
 }
-

@@ -132,8 +132,8 @@ const SubmissionResult = () => {
   const scorePercent = isFallbackMode
     ? ((submission?.totalScore || 0) / 10) * 100
     : totalMaxScore > 0
-    ? ((submission?.totalScore || 0) / totalMaxScore) * 100
-    : 0;
+      ? ((submission?.totalScore || 0) / totalMaxScore) * 100
+      : 0;
 
   const getScoreColor = (pct) => {
     if (pct >= 80) return '#22c55e';
