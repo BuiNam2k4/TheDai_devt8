@@ -262,6 +262,8 @@ const LessonGroupCard = ({ group, isExpanded, onToggleExpand, statusFilter }) =>
                               </span>
                               <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>/ 10</span>
                             </div>
+                          ) : sub.status === 'GRADING_FAILED' || sub.status === 'FAILED' ? (
+                            <span style={{ fontSize: '0.8rem', color: '#ef4444', fontWeight: '600' }}>⚠️ Lỗi chấm điểm</span>
                           ) : (
                             <span style={{ fontSize: '0.8rem', color: '#f59e0b', fontWeight: '600' }}>⏳ Đang chấm AI...</span>
                           )}
