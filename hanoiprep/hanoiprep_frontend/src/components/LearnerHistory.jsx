@@ -10,7 +10,7 @@ import LessonGroupCard from './history/LessonGroupCard';
 import TimelineItemCard from './history/TimelineItemCard';
 import PaginationBar from './history/PaginationBar';
 
-const ITEMS_PER_PAGE = 10;
+const ITEMS_PER_PAGE = 5;
 
 const LearnerHistory = () => {
   const { currentUser } = useContext(AuthContext);
@@ -39,8 +39,12 @@ const LearnerHistory = () => {
       navigate('/login');
       return;
     }
+    if (currentUser.role === 'ROLE_ADMIN') {
+      navigate('/admin/users');
+      return;
+    }
     fetchHistory();
-  }, [currentUser]);
+  }, [currentUser, navigate]);
 
   // Reset về trang 1 khi đổi bộ lọc hoặc chế độ xem
   useEffect(() => {

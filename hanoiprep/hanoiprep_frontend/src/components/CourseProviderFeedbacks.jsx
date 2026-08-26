@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useContext } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { AuthContext } from '../context/AuthContext';
 import authHeader from '../services/auth-header';
@@ -8,18 +8,35 @@ import authHeader from '../services/auth-header';
 import FeedbackStatsCards from './feedbacks/FeedbackStatsCards';
 import FeedbackFilterBar from './feedbacks/FeedbackFilterBar';
 import FeedbackItemCard from './feedbacks/FeedbackItemCard';
+import PaginationBar from './history/PaginationBar';
+
+const ITEMS_PER_PAGE = 5;
 
 const CourseProviderFeedbacks = () => {
   const { currentUser } = useContext(AuthContext);
+  const navigate = useNavigate();
   const [feedbacks, setFeedbacks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [selectedLessonId, setSelectedLessonId] = useState('ALL');
   const [searchTerm, setSearchTerm] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
 
   useEffect(() => {
+    if (!currentUser) {
+      navigate('/login');
+      return;
+    }
+    if (currentUser.role === 'ROLE_ADMIN') {
+      navigate('/admin/users');
+      return;
+    }
+    if (currentUser.role !== 'ROLE_COURSE_PROVIDER') {
+      navigate('/learner/lessons');
+      return;
+    }
     fetchFeedbacks();
-  }, [currentUser]);
+  }, [currentUser, navigate]);
 
   const fetchFeedbacks = async () => {
     if (!currentUser) return;
@@ -61,6 +78,13 @@ const CourseProviderFeedbacks = () => {
       (fb.lesson?.title && fb.lesson.title.toLowerCase().includes(searchTerm.toLowerCase()));
     return matchLesson && matchSearch;
   });
+
+  // Paged slice (5 phản hồi / trang)
+  const totalPages = Math.ceil(filteredFeedbacks.length / ITEMS_PER_PAGE) || 1;
+  const pagedFeedbacks = filteredFeedbacks.slice(
+    (currentPage - 1) * ITEMS_PER_PAGE,
+    currentPage * ITEMS_PER_PAGE
+  );
 
   return (
     <div style={{ maxWidth: '1100px', margin: '2rem auto', padding: '1.5rem' }}>
@@ -118,10 +142,16 @@ const CourseProviderFeedbacks = () => {
       {/* Bộ lọc & Tìm kiếm */}
       <FeedbackFilterBar
         selectedLessonId={selectedLessonId}
-        setSelectedLessonId={setSelectedLessonId}
+        setSelectedLessonId={(val) => {
+          setSelectedLessonId(val);
+          setCurrentPage(1);
+        }}
         uniqueLessons={uniqueLessons}
         searchTerm={searchTerm}
-        setSearchTerm={setSearchTerm}
+        setSearchTerm={(val) => {
+          setSearchTerm(val);
+          setCurrentPage(1);
+        }}
       />
 
       {/* Danh sách phản hồi */}
@@ -147,11 +177,20 @@ const CourseProviderFeedbacks = () => {
           </p>
         </div>
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-          {filteredFeedbacks.map((fb) => (
-            <FeedbackItemCard key={fb.id} fb={fb} />
-          ))}
-        </div>
+        <>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+            {pagedFeedbacks.map((fb) => (
+              <FeedbackItemCard key={fb.id} fb={fb} />
+            ))}
+          </div>
+
+          {/* Thanh Phân Trang (5 phản hồi / trang) */}
+          <PaginationBar
+            currentPage={currentPage}
+            setCurrentPage={setCurrentPage}
+            totalCurrentPages={totalPages}
+          />
+        </>
       )}
     </div>
   );

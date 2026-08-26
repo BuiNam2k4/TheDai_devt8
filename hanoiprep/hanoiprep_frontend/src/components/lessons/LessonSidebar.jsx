@@ -31,9 +31,6 @@ const LessonSidebar = ({ availableLessons, selectedLesson, onSelectLesson }) => 
                   <span style={{ fontSize: '0.75rem', color: 'var(--primary-color)', fontWeight: '700', textTransform: 'uppercase' }}>
                     🏷️ {lesson.category || 'Toán học'}
                   </span>
-                  <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                    #{lesson.id}
-                  </span>
                 </div>
                 <h4 style={{ fontSize: '0.95rem', fontWeight: '600', color: 'var(--text-main)', margin: '0 0 0.25rem 0' }}>
                   {lesson.title}

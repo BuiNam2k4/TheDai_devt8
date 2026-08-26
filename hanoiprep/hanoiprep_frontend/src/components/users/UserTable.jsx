@@ -1,6 +1,11 @@
-import React from 'react';
+import React, { useState } from 'react';
+import PaginationBar from '../history/PaginationBar';
+
+const ITEMS_PER_PAGE = 5;
 
 const UserTable = ({ users, currentUser, onOpenEditModal, onDeactivate, onActivate }) => {
+  const [currentPage, setCurrentPage] = useState(1);
+
   const getRoleBadgeStyle = (role) => {
     switch (role) {
       case 'ROLE_ADMIN':
@@ -12,6 +17,9 @@ const UserTable = ({ users, currentUser, onOpenEditModal, onDeactivate, onActiva
         return { background: 'rgba(16, 185, 129, 0.15)', color: '#34d399', border: '1px solid rgba(16, 185, 129, 0.3)' };
     }
   };
+
+  const totalPages = Math.ceil(users.length / ITEMS_PER_PAGE) || 1;
+  const pagedUsers = users.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
 
   return (
     <div
@@ -43,7 +51,7 @@ const UserTable = ({ users, currentUser, onOpenEditModal, onDeactivate, onActiva
                 </td>
               </tr>
             ) : (
-              users.map((u) => {
+              pagedUsers.map((u) => {
                 const isSelf = u.id === currentUser?.id;
                 const roleBadge = getRoleBadgeStyle(u.role);
 
@@ -59,24 +67,33 @@ const UserTable = ({ users, currentUser, onOpenEditModal, onDeactivate, onActiva
                     <td style={{ padding: '1rem 1.25rem', fontWeight: 600, color: 'var(--text-main)' }}>
                       {u.username} {isSelf && <span style={{ fontSize: '0.75rem', color: 'var(--primary-color)' }}>(Bạn)</span>}
                     </td>
-                    <td style={{ padding: '1rem 1.25rem', color: 'var(--text-muted)', fontSize: '0.9rem' }}>{u.gmail || 'N/A'}</td>
+                    <td style={{ padding: '1rem 1.25rem', color: 'var(--text-muted)', fontSize: '0.9rem' }}>{u.gmail || 'Chưa cập nhật'}</td>
                     <td style={{ padding: '1rem 1.25rem' }}>
-                      <span style={{ fontSize: '0.75rem', padding: '0.2rem 0.6rem', borderRadius: '99px', fontWeight: 700, ...roleBadge }}>
-                        {u.role ? u.role.replace('ROLE_', '') : 'USER'}
+                      <span
+                        style={{
+                          fontSize: '0.75rem',
+                          fontWeight: 700,
+                          padding: '0.25rem 0.65rem',
+                          borderRadius: '1rem',
+                          ...roleBadge,
+                        }}
+                      >
+                        {u.role === 'ROLE_ADMIN' ? 'Admin' : u.role === 'ROLE_COURSE_PROVIDER' ? 'Giáo viên' : 'Học viên'}
                       </span>
                     </td>
                     <td style={{ padding: '1rem 1.25rem' }}>
                       <span
                         style={{
-                          fontSize: '0.75rem',
-                          padding: '0.2rem 0.6rem',
-                          borderRadius: '99px',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '0.35rem',
+                          fontSize: '0.8rem',
                           fontWeight: 600,
-                          background: u.active ? 'rgba(16, 185, 129, 0.15)' : 'rgba(239, 68, 68, 0.15)',
                           color: u.active ? '#34d399' : '#f87171',
                         }}
                       >
-                        {u.active ? '● Đang hoạt động' : '○ Đã khóa'}
+                        <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: u.active ? '#34d399' : '#f87171' }} />
+                        {u.active ? 'Hoạt động' : 'Đã khóa'}
                       </span>
                     </td>
                     <td style={{ padding: '1rem 1.25rem', textAlign: 'right' }}>
@@ -141,6 +158,17 @@ const UserTable = ({ users, currentUser, onOpenEditModal, onDeactivate, onActiva
           </tbody>
         </table>
       </div>
+
+      {/* Phân trang người dùng */}
+      {totalPages > 1 && (
+        <div style={{ padding: '0 1rem 1rem 1rem' }}>
+          <PaginationBar
+            currentPage={currentPage}
+            setCurrentPage={setCurrentPage}
+            totalCurrentPages={totalPages}
+          />
+        </div>
+      )}
     </div>
   );
 };
