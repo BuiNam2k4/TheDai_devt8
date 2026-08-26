@@ -109,6 +109,11 @@ public class DocumentConsistencyValidator {
                 3. [KIỂM TRA TÀI LIỆU RÁC]:
                    - Tệp tin có phải là tài liệu học tập thật sự không? (Không chấp nhận ảnh sinh hoạt cá nhân, biên lai, tài liệu vô nghĩa).
 
+                4. [KIỂM TRA NỘP NGƯỢC FILE ĐỀ BÀI VÀ ĐÁP ÁN (QUAN TRỌNG)]:
+                   - Tệp 1 (questionFile - Đề bài): Phải là nội dung các câu hỏi/yêu cầu bài tập, KHÔNG được chứa sẵn toàn bộ bài giải chi tiết, kết quả số học hoàn chỉnh hay barem điểm.
+                   - Tệp 2 (solutionFile - Đáp án): Phải là hướng dẫn giải/lời giải chi tiết/barem điểm, KHÔNG được chỉ là danh sách câu hỏi trần trụi không có lời giải.
+                   - NẾU phát hiện người dùng tải nhầm Lời giải vào ô Đề bài và tải Đề bài vào ô Đáp án -> BẮT BUỘC trả về `valid: false` kèm reason: "Phát hiện nộp ngược file: Bạn đã tải tệp Lời giải vào ô Đề bài và tệp Đề bài vào ô Đáp án. Vui lòng tráo đổi lại vị trí 2 tệp tin này."
+
                 ================ DỮ LIỆU ĐẦU VÀO ================
                 """);
 
@@ -128,8 +133,8 @@ public class DocumentConsistencyValidator {
                 Hãy trả về DUY NHẤT một đối tượng JSON có cấu trúc sau:
                 {
                   "valid": true / false,
-                  "reason": "Giải thích ngắn gọn, rõ ràng bằng tiếng Việt. Nếu valid=false, chỉ rõ file nào bị lệch (ví dụ: 'File đáp án là môn Tiếng Anh, không khớp với Đề bài là môn Toán'). Nếu valid=true, ghi 'Tài liệu đồng nhất và hợp lệ.'",
-                  "mismatchedFiles": ["Tên các file không khớp, ví dụ: 'solutionFile' hoặc 'materialFile' hoặc để mảng rỗng [] nếu hợp lệ"]
+                  "reason": "Giải thích ngắn gọn, rõ ràng bằng tiếng Việt. Nếu valid=false, chỉ rõ file nào bị lệch hoặc bị nộp ngược. Nếu valid=true, ghi 'Tài liệu đồng nhất và hợp lệ.'",
+                  "mismatchedFiles": ["Tên các file không khớp, ví dụ: 'solutionFile' hoặc 'questionFile' hoặc để mảng rỗng [] nếu hợp lệ"]
                 }
                 """);
 
