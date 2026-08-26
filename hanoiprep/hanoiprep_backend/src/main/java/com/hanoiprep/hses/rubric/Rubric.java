@@ -25,10 +25,10 @@ public class Rubric {
     private String questionNo;
 
     private Integer stepOrder;
-    
+
     @Column(columnDefinition = "NVARCHAR(MAX)")
     private String stepDescription;
-    
+
     private Double maxScore;
     private String expectedLogicKeyword;
 

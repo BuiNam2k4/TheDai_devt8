@@ -10,4 +10,5 @@ public interface SubmissionService {
     Submission getSubmissionById(Long id);
     List<SubmissionDetail> getSubmissionDetails(Long submissionId);
     void gradeSubmissionManually(Long submissionId);
+    Submission updateSubmissionGrades(Long submissionId, UpdateSubmissionGradeRequest request);
 }

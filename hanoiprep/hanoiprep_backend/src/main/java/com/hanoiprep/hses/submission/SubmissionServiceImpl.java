@@ -44,9 +44,11 @@ public class SubmissionServiceImpl implements SubmissionService {
             String filename = answerFile.getOriginalFilename();
             if (filename != null) {
                 String lower = filename.toLowerCase();
-                if (!lower.endsWith(".pdf") && !lower.endsWith(".png") && !lower.endsWith(".jpg") && !lower.endsWith(".jpeg")) {
+                if (!lower.endsWith(".pdf") && !lower.endsWith(".png") && !lower.endsWith(".jpg")
+                        && !lower.endsWith(".jpeg")) {
                     throw new AppException(ErrorCode.INVALID_INPUT,
-                            "File bài nộp không hợp lệ ('" + filename + "'). Hệ thống chỉ chấp nhận file PDF (.pdf) hoặc Hình ảnh (.png, .jpg, .jpeg).");
+                            "File bài nộp không hợp lệ ('" + filename
+                                    + "'). Hệ thống chỉ chấp nhận file PDF (.pdf) hoặc Hình ảnh (.png, .jpg, .jpeg).");
                 }
             }
         }
@@ -72,7 +74,8 @@ public class SubmissionServiceImpl implements SubmissionService {
                         org.apache.pdfbox.text.PDFTextStripper stripper = new org.apache.pdfbox.text.PDFTextStripper();
                         String pdfText = stripper.getText(doc).trim();
                         if (!pdfText.isBlank()) {
-                            if (combinedAnswer.length() > 0) combinedAnswer.append("\n\n--- NỘI DUNG TỪ FILE PDF BÀI LÀM ---\n");
+                            if (combinedAnswer.length() > 0)
+                                combinedAnswer.append("\n\n--- NỘI DUNG TỪ FILE PDF BÀI LÀM ---\n");
                             combinedAnswer.append(pdfText);
                         }
                     } catch (Exception pdfEx) {
@@ -122,8 +125,57 @@ public class SubmissionServiceImpl implements SubmissionService {
         try {
             aiGradingService.gradeSubmission(submissionId);
         } catch (Exception e) {
-            log.error("Lỗi khi chấm điểm thủ công: ", e);
+            log.error("Lỗi khi chấm điểm thủ công cho submission {}: {}", submissionId, e.getMessage(), e);
+            aiGradingService.markGradingFailed(submissionId, e.getMessage());
             throw new AppException(ErrorCode.AI_GRADING_FAILED, "Lỗi khi chấm điểm: " + e.getMessage());
         }
+    }
+
+    @Override
+    @Transactional
+    public Submission updateSubmissionGrades(Long submissionId, UpdateSubmissionGradeRequest request) {
+        Submission submission = submissionRepository.findById(submissionId)
+                .orElseThrow(() -> new AppException(ErrorCode.SUBMISSION_NOT_FOUND));
+
+        if (request.getDetails() != null && !request.getDetails().isEmpty()) {
+            double calculatedTotal = 0.0;
+            for (UpdateSubmissionGradeRequest.DetailGradeUpdate item : request.getDetails()) {
+                if (item.getDetailId() != null) {
+                    SubmissionDetail detail = submissionDetailRepository.findById(item.getDetailId())
+                            .orElse(null);
+                    if (detail != null && detail.getSubmission().getId().equals(submissionId)) {
+                        if (item.getAwardedScore() != null) {
+                            double maxScore = detail.getRubric() != null ? detail.getRubric().getMaxScore() : 10.0;
+                            if (item.getAwardedScore() < 0 || item.getAwardedScore() > maxScore) {
+                                String qInfo = detail.getRubric() != null ? (detail.getRubric().getQuestionNo() + " - Bước " + detail.getRubric().getStepOrder()) : "tiêu chí";
+                                throw new AppException(ErrorCode.INVALID_INPUT,
+                                        "Điểm nhập (" + item.getAwardedScore() + ") cho " + qInfo
+                                                + " không hợp lệ. Điểm phải nằm trong khoảng từ 0 đến " + maxScore + " điểm.");
+                            }
+                            double safeScore = Math.round(item.getAwardedScore() * 100.0) / 100.0;
+                            detail.setAwardedScore(safeScore);
+                            calculatedTotal += safeScore;
+                        }
+                        if (item.getFeedback() != null) {
+                            detail.setAiFeedback(item.getFeedback());
+                        }
+                        submissionDetailRepository.save(detail);
+                    }
+                }
+            }
+
+            if (request.getTotalScore() != null) {
+                submission.setTotalScore(Math.round(request.getTotalScore() * 100.0) / 100.0);
+            } else {
+                submission.setTotalScore(Math.round(calculatedTotal * 100.0) / 100.0);
+            }
+        } else if (request.getTotalScore() != null) {
+            submission.setTotalScore(Math.round(request.getTotalScore() * 100.0) / 100.0);
+        }
+
+        submission.setStatus("GRADED");
+        submission.setGradedAt(LocalDateTime.now());
+        log.info("Giáo viên đã cập nhật điểm bài nộp {}: tổng điểm {}", submissionId, submission.getTotalScore());
+        return submissionRepository.save(submission);
     }
 }

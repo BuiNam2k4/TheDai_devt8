@@ -1,9 +1,11 @@
 package com.hanoiprep.hses.user;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.hanoiprep.hses.submission.Submission;
 import jakarta.persistence.*;
 import lombok.*;
+
 import java.util.List;
-import com.hanoiprep.hses.submission.Submission;
 
 @Entity
 @Table(name = "users")
@@ -29,7 +31,7 @@ public class User {
     @Builder.Default
     private boolean active = true;
 
-    @com.fasterxml.jackson.annotation.JsonIgnore
+    @JsonIgnore
     @OneToMany(mappedBy = "user")
     private List<Submission> submissions;
 }

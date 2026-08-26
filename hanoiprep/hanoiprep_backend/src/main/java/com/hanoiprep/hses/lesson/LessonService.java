@@ -6,7 +6,9 @@ import java.util.Map;
 
 public interface LessonService {
     List<Lesson> getAllLessons();
+
     Lesson getLessonById(Long id);
+
     Map<String, Object> createLesson(
             String title,
             String category,
@@ -14,7 +16,8 @@ public interface LessonService {
             Long providerId,
             MultipartFile materialFile,
             MultipartFile questionFile,
-            MultipartFile solutionFile
-    );
-    org.springframework.http.ResponseEntity<org.springframework.core.io.Resource> downloadLessonFile(Long id, String type);
+            MultipartFile solutionFile);
+
+    org.springframework.http.ResponseEntity<org.springframework.core.io.Resource> downloadLessonFile(Long id,
+            String type);
 }

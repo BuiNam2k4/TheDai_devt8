@@ -32,7 +32,7 @@ public class Submission {
     private String answerText;
     private String status;
     private Double totalScore;
-    
+
     private LocalDateTime createdAt;
     private LocalDateTime gradedAt;
 
