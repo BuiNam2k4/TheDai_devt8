@@ -222,6 +222,12 @@ public class AIGradingService {
                 List<AIGradingResultDto> results = objectMapper.readValue(coreJson, new TypeReference<>() {
                 });
 
+                if ((results == null || results.isEmpty()) && (rubrics != null && !rubrics.isEmpty())) {
+                        log.error("AI returned empty results for submission {} with {} rubrics", submission.getId(), rubrics.size());
+                        throw new AppException(ErrorCode.AI_GRADING_FAILED,
+                                        "AI không thể phân tích được cấu trúc bài làm hoặc kết quả trả về rỗng.");
+                }
+
                 if (results.size() != rubrics.size()) {
                         log.warn(
                                         "AI returned {} results but expected {} rubric steps for submission {}. Proceeding with best-effort matching.",

@@ -125,7 +125,8 @@ public class SubmissionServiceImpl implements SubmissionService {
         try {
             aiGradingService.gradeSubmission(submissionId);
         } catch (Exception e) {
-            log.error("Lỗi khi chấm điểm thủ công: ", e);
+            log.error("Lỗi khi chấm điểm thủ công cho submission {}: {}", submissionId, e.getMessage(), e);
+            aiGradingService.markGradingFailed(submissionId, e.getMessage());
             throw new AppException(ErrorCode.AI_GRADING_FAILED, "Lỗi khi chấm điểm: " + e.getMessage());
         }
     }
