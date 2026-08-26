@@ -6,7 +6,15 @@ const getScoreColor = (pct) => {
   return '#ef4444';
 };
 
-const QuestionGradingGroup = ({ groupedDetails, overallScorePercent }) => {
+const QuestionGradingGroup = ({
+  groupedDetails,
+  overallScorePercent,
+  isEditingGrades = false,
+  editedScores = {},
+  editedFeedbacks = {},
+  onScoreChange = () => {},
+  onFeedbackChange = () => {},
+}) => {
   if (Object.keys(groupedDetails).length === 0) {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
@@ -20,13 +28,35 @@ const QuestionGradingGroup = ({ groupedDetails, overallScorePercent }) => {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-      <h2 style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-        🤖 Kết quả đánh giá chi tiết theo từng Bài / Câu
-      </h2>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
+        <h2 style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '0.5rem', margin: 0 }}>
+          🤖 Kết quả đánh giá chi tiết theo từng Bài / Câu
+        </h2>
+        {isEditingGrades && (
+          <span
+            style={{
+              background: '#fef3c7',
+              color: '#92400e',
+              border: '1px solid #fcd34d',
+              padding: '4px 12px',
+              borderRadius: '99px',
+              fontSize: '0.85rem',
+              fontWeight: 700,
+            }}
+          >
+            ✏️ Chế độ Giáo viên chỉnh sửa
+          </span>
+        )}
+      </div>
 
       {Object.entries(groupedDetails).map(([qNo, qDetails], qIndex) => {
         const qMaxScore = qDetails.reduce((sum, d) => sum + (d.rubric?.maxScore || 0), 0);
-        const qAwarded = qDetails.reduce((sum, d) => sum + (d.awardedScore || 0), 0);
+        const qAwarded = qDetails.reduce((sum, d) => {
+          const currentScore = isEditingGrades && editedScores[d.id] !== undefined
+            ? parseFloat(editedScores[d.id]) || 0
+            : (d.awardedScore || 0);
+          return sum + currentScore;
+        }, 0);
         const qPercent = qMaxScore > 0 ? (qAwarded / qMaxScore) * 100 : 100;
         const qColor = getScoreColor(qPercent);
 
@@ -83,11 +113,18 @@ const QuestionGradingGroup = ({ groupedDetails, overallScorePercent }) => {
             {/* Danh sách các bước trong Bài/Câu */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
               {qDetails.map((detail, stepIdx) => {
+                const currentScore = isEditingGrades && editedScores[detail.id] !== undefined
+                  ? parseFloat(editedScores[detail.id]) || 0
+                  : (detail.awardedScore || 0);
+
+                const currentFeedback = isEditingGrades && editedFeedbacks[detail.id] !== undefined
+                  ? editedFeedbacks[detail.id]
+                  : (detail.aiFeedback || '');
+
                 const detailPercent = detail.rubric
-                  ? (detail.awardedScore / detail.rubric.maxScore) * 100
+                  ? (currentScore / detail.rubric.maxScore) * 100
                   : overallScorePercent;
                 const detailColor = getScoreColor(detailPercent);
-                const feedbackText = detail.aiFeedback || '';
 
                 return (
                   <div
@@ -110,7 +147,7 @@ const QuestionGradingGroup = ({ groupedDetails, overallScorePercent }) => {
                         gap: '0.5rem',
                       }}
                     >
-                      <div>
+                      <div style={{ flex: '1 1 300px' }}>
                         <h4
                           style={{
                             fontSize: '0.95rem',
@@ -142,34 +179,118 @@ const QuestionGradingGroup = ({ groupedDetails, overallScorePercent }) => {
                           background: 'var(--bg-color)',
                           border: `1px solid ${detailColor}`,
                           borderRadius: '0.5rem',
-                          padding: '0.25rem 0.6rem',
+                          padding: isEditingGrades ? '0.35rem 0.6rem' : '0.25rem 0.6rem',
                           textAlign: 'center',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.35rem',
                         }}
                       >
-                        <span style={{ fontSize: '1.1rem', fontWeight: 800, color: detailColor }}>
-                          {detail.awardedScore?.toFixed(1)}
-                        </span>
-                        {detail.rubric && (
-                          <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                            /{detail.rubric.maxScore}
-                          </span>
+                        {isEditingGrades ? (
+                          <>
+                            <input
+                              type="number"
+                              step="0.25"
+                              min="0"
+                              max={detail.rubric?.maxScore || 10}
+                              value={editedScores[detail.id] !== undefined ? editedScores[detail.id] : (detail.awardedScore ?? 0)}
+                              onChange={(e) => onScoreChange(detail.id, e.target.value)}
+                              style={{
+                                width: '70px',
+                                padding: '0.3rem 0.4rem',
+                                borderRadius: '0.4rem',
+                                border: (currentScore > (detail.rubric?.maxScore || 10) || currentScore < 0)
+                                  ? '2px solid #ef4444'
+                                  : '1px solid var(--primary-color)',
+                                fontWeight: 800,
+                                fontSize: '1rem',
+                                color: (currentScore > (detail.rubric?.maxScore || 10) || currentScore < 0)
+                                  ? '#ef4444'
+                                  : detailColor,
+                                textAlign: 'center',
+                                background: (currentScore > (detail.rubric?.maxScore || 10) || currentScore < 0)
+                                  ? '#fee2e2'
+                                  : 'var(--card-bg)',
+                              }}
+                            />
+                            {detail.rubric && (
+                              <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)', fontWeight: 600 }}>
+                                /{detail.rubric.maxScore}
+                              </span>
+                            )}
+                          </>
+                        ) : (
+                          <>
+                            <span style={{ fontSize: '1.1rem', fontWeight: 800, color: detailColor }}>
+                              {detail.awardedScore?.toFixed(1)}
+                            </span>
+                            {detail.rubric && (
+                              <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                                /{detail.rubric.maxScore}
+                              </span>
+                            )}
+                          </>
                         )}
                       </div>
                     </div>
 
-                    <div
-                      style={{
-                        background: 'var(--bg-color)',
-                        borderRadius: '0.5rem',
-                        padding: '0.85rem',
-                        fontSize: '0.88rem',
-                        color: 'var(--text-primary)',
-                        lineHeight: 1.6,
-                        whiteSpace: 'pre-wrap',
-                      }}
-                    >
-                      {feedbackText}
-                    </div>
+                    {isEditingGrades && detail.rubric && (currentScore > detail.rubric.maxScore || currentScore < 0) && (
+                      <div
+                        style={{
+                          background: '#fee2e2',
+                          color: '#dc2626',
+                          fontSize: '0.8rem',
+                          fontWeight: 600,
+                          padding: '4px 10px',
+                          borderRadius: '6px',
+                          marginBottom: '0.75rem',
+                          display: 'inline-block',
+                        }}
+                      >
+                        ⚠️ Điểm không hợp lệ: Điểm cho bước này phải nằm trong khoảng từ 0 đến {detail.rubric.maxScore} điểm!
+                      </div>
+                    )}
+
+                    {isEditingGrades ? (
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '0.35rem' }}>
+                          💬 Nhận xét / Đánh giá của Giáo viên cho bước này:
+                        </label>
+                        <textarea
+                          rows={3}
+                          value={currentFeedback}
+                          onChange={(e) => onFeedbackChange(detail.id, e.target.value)}
+                          placeholder="Nhập nhận xét hoặc chỉnh sửa phản hồi..."
+                          style={{
+                            width: '100%',
+                            boxSizing: 'border-box',
+                            padding: '0.75rem',
+                            borderRadius: '0.5rem',
+                            border: '1px solid var(--border-color)',
+                            background: 'var(--bg-color)',
+                            color: 'var(--text-primary)',
+                            fontSize: '0.9rem',
+                            lineHeight: 1.5,
+                            fontFamily: 'inherit',
+                            resize: 'vertical',
+                          }}
+                        />
+                      </div>
+                    ) : (
+                      <div
+                        style={{
+                          background: 'var(--bg-color)',
+                          borderRadius: '0.5rem',
+                          padding: '0.85rem',
+                          fontSize: '0.88rem',
+                          color: 'var(--text-primary)',
+                          lineHeight: 1.6,
+                          whiteSpace: 'pre-wrap',
+                        }}
+                      >
+                        {detail.aiFeedback || 'Đã hoàn thành tiêu chí.'}
+                      </div>
+                    )}
                   </div>
                 );
               })}
@@ -182,3 +303,4 @@ const QuestionGradingGroup = ({ groupedDetails, overallScorePercent }) => {
 };
 
 export default QuestionGradingGroup;
+
