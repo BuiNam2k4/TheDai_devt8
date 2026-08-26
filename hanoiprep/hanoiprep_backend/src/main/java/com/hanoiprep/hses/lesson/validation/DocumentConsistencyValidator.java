@@ -90,31 +90,45 @@ public class DocumentConsistencyValidator {
     private String buildValidationPrompt(String questionText, String solutionText, String materialText) {
         StringBuilder sb = new StringBuilder();
         sb.append("""
-                Bạn là Chuyên gia Thẩm định Học liệu Giáo dục của hệ thống HanoiPrep.
-                Nhiệm vụ của bạn là kiểm tra tính đồng nhất, hợp lệ và liên quan trực tiếp giữa các tệp tin tải lên.
+                Bạn là Chuyên gia Thẩm định Học liệu Giáo dục cao cấp của hệ thống HanoiPrep.
+                Nhiệm vụ của bạn là kiểm tra tính ĐỒNG NHẤT, ĐÚNG VAI TRÒ và TƯƠNG THÍCH HOÀN TOÀN giữa 3 tệp tin học liệu tải lên:
+                1. Tệp Đề bài (`questionFile`)
+                2. Tệp Đáp án (`solutionFile`)
+                3. Tệp Tài liệu học tập / Lý thuyết (`materialFile` - nếu có)
 
                 LƯU Ý QUAN TRỌNG:
                 - KHÔNG cần so khớp với tiêu đề bài học.
-                - Tập trung 100% vào việc so sánh nội dung giữa các tệp tin với nhau.
+                - Tập trung 100% vào việc phân tích bản chất nội dung và mối tương quan giữa các tệp tin với nhau.
 
-                CÁC TIÊU CHÍ ĐÁNH GIÁ (BẮT BUỘC):
-                1. [ĐỀ BÀI vs ĐÁP ÁN - QUAN TRỌNG NHẤT]:
-                   - Đáp án có phải là lời giải/hướng dẫn chấm cho các câu hỏi có trong Đề bài hay không?
-                   - Có cùng môn học (Toán, Lý, Hóa, Văn, Tiếng Anh...), cùng cấp độ và cùng chuyên đề kiến thức không?
-                   - Ví dụ KHÔNG HỢP LỆ: Đề bài là môn Toán nhưng Đáp án là môn Tiếng Anh; hoặc Đề bài gồm 5 câu hỏi nhưng Đáp án lại giải cho một đề hoàn toàn khác.
+                ================ CÁC QUY TẮC THẨM ĐỊNH BẮT BUỘC ================
 
-                2. [TÀI LIỆU LÝ THUYẾT vs ĐỀ BÀI (Nếu có)]:
-                   - Tài liệu bài giảng có cùng môn học và thuộc phạm vi kiến thức bổ trợ cho Đề bài/Đáp án không?
+                QUY TẮC 1: ĐÚNG VAI TRÒ TỪNG TỆP TIN (ROLE INTEGRITY)
+                - [Tệp 1 - questionFile (ĐỀ BÀI)]:
+                  + BẮT BUỘC: Phải là tập hợp các câu hỏi, bài toán, đề thi mà học sinh cần giải.
+                  + KHÔNG ĐƯỢC: Chứa sẵn toàn bộ bài giải chi tiết, kết quả số học hoàn chỉnh hay barem điểm; KHÔNG ĐƯỢC là tài liệu lý thuyết giáo trình thuần túy không có bài tập.
+                
+                - [Tệp 2 - solutionFile (ĐÁP ÁN)]:
+                  + BẮT BUỘC: Phải là hướng dẫn giải, các bước giải chi tiết, đáp án hoặc barem chấm điểm cho CHÍNH XÁC các câu hỏi trong Tệp 1.
+                  + KHÔNG ĐƯỢC: Chỉ là danh sách câu hỏi trần trụi không có bài giải; KHÔNG ĐƯỢC là tài liệu lý thuyết chung chung.
 
-                3. [KIỂM TRA TÀI LIỆU RÁC]:
-                   - Tệp tin có phải là tài liệu học tập thật sự không? (Không chấp nhận ảnh sinh hoạt cá nhân, biên lai, tài liệu vô nghĩa).
+                - [Tệp 3 - materialFile (TÀI LIỆU HỌC TẬP / LÝ THUYẾT - nếu có)]:
+                  + BẮT BUỘC: Phải là lý thuyết, định lý, công thức, bài giảng hoặc kiến thức bổ trợ cùng chuyên đề với Đề bài.
+                  + KHÔNG ĐƯỢC: Nộp nhầm đề bài hay đáp án vào đây; KHÔNG ĐƯỢC lệch môn học (ví dụ: Đề bài là Toán nhưng Tài liệu là môn Văn/Sử/Sinh).
 
-                4. [KIỂM TRA NỘP NGƯỢC FILE ĐỀ BÀI VÀ ĐÁP ÁN (QUAN TRỌNG)]:
-                   - Tệp 1 (questionFile - Đề bài): Phải là nội dung các câu hỏi/yêu cầu bài tập, KHÔNG được chứa sẵn toàn bộ bài giải chi tiết, kết quả số học hoàn chỉnh hay barem điểm.
-                   - Tệp 2 (solutionFile - Đáp án): Phải là hướng dẫn giải/lời giải chi tiết/barem điểm, KHÔNG được chỉ là danh sách câu hỏi trần trụi không có lời giải.
-                   - NẾU phát hiện người dùng tải nhầm Lời giải vào ô Đề bài và tải Đề bài vào ô Đáp án -> BẮT BUỘC trả về `valid: false` kèm reason: "Phát hiện nộp ngược file: Bạn đã tải tệp Lời giải vào ô Đề bài và tệp Đề bài vào ô Đáp án. Vui lòng tráo đổi lại vị trí 2 tệp tin này."
+                QUY TẮC 2: PHÁT HIỆN TẤT CẢ CÁC TRƯỜNG HỢP NỘP NHẦM / TRÁO ĐỔI VỊ TRÍ (SWAPPED FILES)
+                - Nếu Đề bài <-> Đáp án bị tráo đổi (Đề bài chứa lời giải, Đáp án chứa đề bài) -> `valid: false`, reason: "Phát hiện nộp ngược file: Bạn đã tải tệp Lời giải vào ô Đề bài và tệp Đề bài vào ô Đáp án. Vui lòng tráo đổi lại vị trí 2 tệp này."
+                - Nếu Tài liệu lý thuyết <-> Đề bài bị tráo đổi (Ô Đề bài là lý thuyết giáo trình, ô Tài liệu là đề bài) -> `valid: false`, reason: "Phát hiện nộp nhầm file: Ô Đề bài đang chứa tài liệu lý thuyết bài giảng. Vui lòng kiểm tra lại vị trí các file."
+                - Nếu Tài liệu lý thuyết <-> Đáp án bị tráo đổi (Ô Đáp án là tài liệu lý thuyết không có lời giải) -> `valid: false`, reason: "Phát hiện nộp nhầm file: Tệp tải vào ô Đáp án không chứa lời giải cho đề bài mà là tài liệu lý thuyết."
+                - Nếu 2 hoặc 3 tệp tin bị nộp trùng lặp nội dung giống hệt nhau -> `valid: false`, reason: "Phát hiện tệp tin bị tải trùng lặp nội dung giữa các ô."
 
-                ================ DỮ LIỆU ĐẦU VÀO ================
+                QUY TẮC 3: ĐỒNG NHẤT MÔN HỌC & CHUYÊN ĐỀ (SUBJECT & TOPIC CONSISTENCY)
+                - Cả 3 tệp tin (Đề bài, Đáp án, Tài liệu) BẮT BUỘC phải cùng một môn học (Toán, Lý, Hóa, Văn, Tiếng Anh...), cùng cấp độ và cùng một chủ đề kiến thức.
+                - KHÔNG chấp nhận: Đề bài là môn Toán nhưng Đáp án là môn Hóa học; hoặc Đề bài gồm 3 bài toán hình học nhưng Đáp án lại giải 5 câu đại số hoàn toàn khác.
+
+                QUY TẮC 4: LOẠI BỎ TÀI LIỆU RÁC (SPAM / JUNK CONTENT)
+                - Mọi tệp tin phải là tài liệu giáo dục thực sự. Tuyệt đối không chấp nhận ảnh sinh hoạt cá nhân, phong cảnh, biên lai, hóa đơn hoặc văn bản vô nghĩa.
+
+                ================ DỮ LIỆU ĐẦU VÀO CẦN PHÂN TÍCH ================
                 """);
 
         sb.append("--- TỆP 1: NỘI DUNG ĐỀ BÀI (questionFile) ---\n")
@@ -133,8 +147,8 @@ public class DocumentConsistencyValidator {
                 Hãy trả về DUY NHẤT một đối tượng JSON có cấu trúc sau:
                 {
                   "valid": true / false,
-                  "reason": "Giải thích ngắn gọn, rõ ràng bằng tiếng Việt. Nếu valid=false, chỉ rõ file nào bị lệch hoặc bị nộp ngược. Nếu valid=true, ghi 'Tài liệu đồng nhất và hợp lệ.'",
-                  "mismatchedFiles": ["Tên các file không khớp, ví dụ: 'solutionFile' hoặc 'questionFile' hoặc để mảng rỗng [] nếu hợp lệ"]
+                  "reason": "Giải thích ngắn gọn, súc tích và chính xác bằng tiếng Việt. Nếu valid=false, chỉ rõ đích danh tệp nào bị sai vai trò, bị nộp nhầm hoặc lệch môn học. Nếu valid=true, ghi 'Tài liệu học tập, Đề bài và Đáp án hoàn toàn đồng nhất, đúng vai trò.'",
+                  "mismatchedFiles": ["Tên các file không khớp, ví dụ: 'solutionFile', 'questionFile', 'materialFile' hoặc để mảng rỗng [] nếu hợp lệ"]
                 }
                 """);
 
