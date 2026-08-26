@@ -327,4 +327,37 @@ public class AIGradingService {
 
                 return "[]";
         }
+
+        /**
+         * Đánh dấu bài nộp thất bại khi AI chấm bài gặp sự cố (quá tải, API key lỗi, format lỗi...)
+         */
+        @Transactional
+        public void markGradingFailed(Long submissionId, String errorMessage) {
+                try {
+                        Submission submission = submissionRepository.findById(submissionId).orElse(null);
+                        if (submission != null) {
+                                submission.setStatus("GRADING_FAILED");
+                                submissionRepository.save(submission);
+
+                                // Xóa chi tiết cũ nếu có và thêm thông báo lỗi
+                                try {
+                                        submissionDetailRepository.deleteBySubmissionId(submissionId);
+                                } catch (Exception ignored) {
+                                }
+
+                                submissionDetailRepository.save(SubmissionDetail.builder()
+                                                .submission(submission)
+                                                .rubric(null)
+                                                .awardedScore(0.0)
+                                                .aiFeedback("⚠️ Quá trình chấm bài tự động qua AI gặp sự cố: "
+                                                                + (errorMessage != null ? errorMessage : "Không rõ nguyên nhân")
+                                                                + ". Bạn có thể nhấn 'Thử chấm lại' hoặc đợi giáo viên kiểm tra.")
+                                                .build());
+
+                                log.warn("Marked submission {} as GRADING_FAILED: {}", submissionId, errorMessage);
+                        }
+                } catch (Exception e) {
+                        log.error("Failed to mark submission {} as GRADING_FAILED: {}", submissionId, e.getMessage());
+                }
+        }
 }

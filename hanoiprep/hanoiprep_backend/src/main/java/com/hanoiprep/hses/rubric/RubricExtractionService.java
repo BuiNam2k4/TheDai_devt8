@@ -6,7 +6,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.hanoiprep.hses.chatbot.GeminiService;
 import com.hanoiprep.hses.common.exception.AppException;
 import com.hanoiprep.hses.common.exception.ErrorCode;
-import com.hanoiprep.hses.common.util.AiJsonUtils;
 import com.hanoiprep.hses.lesson.Lesson;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
@@ -373,5 +372,52 @@ public class RubricExtractionService {
         List<Rubric> saved = rubricRepository.saveAll(toSave);
         log.info("Saved {} new AI-extracted rubrics for lesson {}", saved.size(), lesson.getId());
         return saved;
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Helper: trích xuất & tự động sửa lỗi JSON Array từ response AI
+    // ─────────────────────────────────────────────────────────────────────────
+    private String extractJsonArray(String text) {
+        if (text == null)
+            return "[]";
+        text = text.trim();
+
+        if (text.startsWith("```json"))
+            text = text.substring(7);
+        else if (text.startsWith("```"))
+            text = text.substring(3);
+        if (text.endsWith("```"))
+            text = text.substring(0, text.length() - 3);
+        text = text.trim();
+
+        int start = text.indexOf('[');
+        int end = text.lastIndexOf(']');
+        if (start != -1 && end != -1 && end > start) {
+            String candidate = text.substring(start, end + 1);
+            try {
+                objectMapper.readTree(candidate);
+                return candidate;
+            } catch (Exception ignored) {
+            }
+        }
+
+        // Fallback: Regex trích xuất tất cả các đối tượng JSON {...} hoàn chỉnh hợp lệ
+        java.util.regex.Pattern pattern = java.util.regex.Pattern.compile("\\{[^{}]*\\}");
+        java.util.regex.Matcher matcher = pattern.matcher(text);
+        List<String> validObjects = new ArrayList<>();
+        while (matcher.find()) {
+            String objStr = matcher.group();
+            try {
+                objectMapper.readTree(objStr);
+                validObjects.add(objStr);
+            } catch (Exception ignored) {
+            }
+        }
+
+        if (!validObjects.isEmpty()) {
+            return "[" + String.join(",", validObjects) + "]";
+        }
+
+        return "[]";
     }
 }
