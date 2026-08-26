@@ -53,4 +53,13 @@ public class SubmissionController {
         submissionService.gradeSubmissionManually(id);
         return ResponseEntity.ok(ApiResponse.success("Chấm điểm thành công bằng AI", null));
     }
+
+    @PutMapping("/{id}/grades")
+    public ResponseEntity<ApiResponse<Submission>> updateSubmissionGrades(
+            @PathVariable Long id,
+            @RequestBody UpdateSubmissionGradeRequest request
+    ) {
+        Submission updated = submissionService.updateSubmissionGrades(id, request);
+        return ResponseEntity.ok(ApiResponse.success("Cập nhật điểm và nhận xét của giáo viên thành công", updated));
+    }
 }
