@@ -66,7 +66,6 @@ public class RubricExtractionService {
      * Tái sử dụng trực tiếp text đáp án đã được OCR và chuẩn hóa từ bước kiểm tra
      * nhất quán
      */
-    @Transactional
     public List<Rubric> extractAndSaveRubricsFromText(Lesson lesson, String solutionText) {
         if (solutionText == null || solutionText.isBlank()) {
             return extractAndSaveRubricsFromLessonEntity(lesson);
@@ -82,7 +81,7 @@ public class RubricExtractionService {
             log.error("Sinh rubric từ text đáp án thất bại cho lesson {}: {}", lesson.getId(), e.getMessage());
             throw new AppException(ErrorCode.RUBRIC_EXTRACTION_FAILED,
                     "Không thể tự động trích xuất Barem chấm điểm từ file đáp án: " + e.getMessage()
-                    + ". Vui lòng kiểm tra lại nội dung file đáp án (đảm bảo rõ ràng các câu, các bước giải và điểm số).");
+                            + ". Vui lòng kiểm tra lại nội dung file đáp án (đảm bảo rõ ràng các câu, các bước giải và điểm số).");
         }
     }
 
@@ -119,7 +118,7 @@ public class RubricExtractionService {
             log.error("Gemini rubric extraction failed for lesson {}: {}", lesson.getId(), e.getMessage());
             throw new AppException(ErrorCode.RUBRIC_EXTRACTION_FAILED,
                     "Không thể tự động trích xuất Barem chấm điểm từ file đáp án: " + e.getMessage()
-                    + ". Vui lòng kiểm tra lại nội dung file đáp án (đảm bảo rõ ràng các câu, các bước giải và điểm số).");
+                            + ". Vui lòng kiểm tra lại nội dung file đáp án (đảm bảo rõ ràng các câu, các bước giải và điểm số).");
         }
     }
 
@@ -176,7 +175,7 @@ public class RubricExtractionService {
             log.error("Rubric generation failed for lesson {}: {}", lesson.getId(), e.getMessage());
             throw new AppException(ErrorCode.RUBRIC_EXTRACTION_FAILED,
                     "Không thể tự động trích xuất Barem chấm điểm cho bài học: " + e.getMessage()
-                    + ". Vui lòng kiểm tra lại nội dung đáp án.");
+                            + ". Vui lòng kiểm tra lại nội dung đáp án.");
         }
     }
 
@@ -307,7 +306,7 @@ public class RubricExtractionService {
             throw new RuntimeException("Gemini returned empty rubric list");
         }
 
-        // Lọc và làm sạch điểm số âm / null
+        // Giữ nguyên 100% điểm số gốc theo barem trong file đáp án của giáo viên
         for (RubricDto dto : dtos) {
             if (dto.getMaxScore() == null || dto.getMaxScore() <= 0) {
                 dto.setMaxScore(0.5);
@@ -315,22 +314,8 @@ public class RubricExtractionService {
         }
 
         double total = dtos.stream().mapToDouble(RubricDto::getMaxScore).sum();
-        if (total <= 0) {
-            throw new RuntimeException("Total rubric score is invalid (<= 0)");
-        }
-
-        // Normalize: Đảm bảo tổng điểm bài thi luôn bằng chính xác 10.0
-        if (Math.abs(total - 10.0) > 0.01) {
-            log.warn("Rubric total score is {} (expected 10.0) for lesson {}. Normalizing...", total, lesson.getId());
-            final double factor = 10.0 / total;
-            for (RubricDto d : dtos) {
-                double scaled = Math.round(d.getMaxScore() * factor * 100.0) / 100.0;
-                d.setMaxScore(Math.max(0.1, scaled));
-            }
-        }
-
-        log.info("Successfully generated {} rubric steps for lesson {} (total score: {})",
-                dtos.size(), lesson.getId(), dtos.stream().mapToDouble(RubricDto::getMaxScore).sum());
+        log.info("Trích xuất thành công {} tiêu chí barem cho bài học {} (Tổng điểm gốc: {})",
+                dtos.size(), lesson.getId(), total);
         return dtos;
     }
 

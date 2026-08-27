@@ -73,7 +73,7 @@ const LessonProviderSubmissions = ({ submissions, lessonFeedbacks }) => {
                   <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
                     {sub.status === 'GRADED' ? (
                       <span style={{ fontWeight: '800', color: '#10b981', fontSize: '1.1rem' }}>
-                        {sub.totalScore != null ? sub.totalScore.toFixed(1) : 'N/A'} <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>/ 10</span>
+                        {sub.totalScore != null ? Number(sub.totalScore.toFixed(2)) : 'N/A'} <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>/ 10</span>
                       </span>
                     ) : (
                       <span style={{ fontSize: '0.8rem', color: '#f59e0b', fontWeight: '600' }}>

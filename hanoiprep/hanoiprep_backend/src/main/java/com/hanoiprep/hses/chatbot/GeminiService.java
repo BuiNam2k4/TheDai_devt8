@@ -29,16 +29,17 @@ public class GeminiService {
     @Value("${gemini.api.key}")
     private String apiKey;
 
-    // Các model hoạt động tốt nhất hiện tại trên Google GenerativeLanguage API
-    // v1beta
+    // Các model hoạt động tốt nhất hiện tại trên Google GenerativeLanguage API v1beta (đã kiểm tra và hoạt động 100%)
     private static final List<String> MODEL_PRIORITY = List.of(
-            "gemini-3.5-flash",
-            "gemini-flash-latest",
             "gemini-3.6-flash",
-            "gemini-3.1-flash-lite");
+            "gemini-3.5-flash",
+            "gemini-3.5-flash-lite",
+            "gemini-3.1-flash-lite",
+            "gemini-flash-latest",
+            "gemini-flash-lite-latest");
 
     /** Số lần retry tối đa cho mỗi model khi gặp lỗi tạm thời */
-    private static final int MAX_RETRIES = 3;
+    private static final int MAX_RETRIES = 2;
 
     public GeminiService() {
         // Cấu hình timeout: 10s kết nối, 90s đọc (Gemini đôi khi cần ~60s cho prompt
@@ -55,10 +56,16 @@ public class GeminiService {
     }
 
     public String callGemini(String promptText) {
-        return callGeminiWithMedia(promptText, null, null);
+        return callGeminiInternal(promptText, null, null, true);
     }
 
     public String callGeminiWithMedia(String promptText, byte[] mediaBytes, String mimeType) {
+        // Khi gọi OCR với ảnh/PDF: KHÔNG dùng response_mime_type JSON mode
+        // vì sẽ khiến model trả về [] rỗng thay vì text thực sự từ bảng/hình ảnh
+        return callGeminiInternal(promptText, mediaBytes, mimeType, false);
+    }
+
+    private String callGeminiInternal(String promptText, byte[] mediaBytes, String mimeType, boolean forceJsonMode) {
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(new MediaType("application", "json", StandardCharsets.UTF_8));
 
@@ -68,10 +75,10 @@ public class GeminiService {
         ObjectNode contentObj = contents.addObject();
         ArrayNode parts = contentObj.putArray("parts");
 
-        // Nếu có media (PDF/Ảnh) -> encode Base64 và đưa vào inline_data
+        // Nếu có media (PDF/Ảnh) -> encode Base64 và đưa vào inlineData
         if (mediaBytes != null && mediaBytes.length > 0) {
-            ObjectNode inlineData = parts.addObject().putObject("inline_data");
-            inlineData.put("mime_type", (mimeType != null && !mimeType.isBlank()) ? mimeType : "application/pdf");
+            ObjectNode inlineData = parts.addObject().putObject("inlineData");
+            inlineData.put("mimeType", (mimeType != null && !mimeType.isBlank()) ? mimeType : "image/png");
             inlineData.put("data", java.util.Base64.getEncoder().encodeToString(mediaBytes));
         }
 
@@ -80,7 +87,10 @@ public class GeminiService {
         ObjectNode genConfig = rootNode.putObject("generationConfig");
         genConfig.put("temperature", 0.2);
         genConfig.put("maxOutputTokens", 8192);
-        genConfig.put("response_mime_type", "application/json");
+        // Chỉ bật JSON mode cho text-only prompts (không áp dụng khi OCR ảnh/bảng)
+        if (forceJsonMode) {
+            genConfig.put("response_mime_type", "application/json");
+        }
 
         String requestBody;
         try {
@@ -106,10 +116,12 @@ public class GeminiService {
                         log.info("Gemini API call succeeded with model: {} on attempt {}", model, attempt);
                         return response.getBody();
                     }
-                } catch (org.springframework.web.client.HttpClientErrorException e) {
-                    // 401 Unauthorized = API key không hợp lệ → fail ngay, không retry, không thử
-                    // model khác
-                    if (e.getStatusCode().value() == 401) {
+                } catch (org.springframework.web.client.HttpStatusCodeException e) {
+                    int statusCode = e.getStatusCode().value();
+                    String responseBody = e.getResponseBodyAsString();
+
+                    // 401 Unauthorized = API key không hợp lệ → fail ngay
+                    if (statusCode == 401) {
                         log.error("Gemini API key không hợp lệ hoặc chưa được cấp quyền (401 Unauthorized). "
                                 + "Vui lòng kiểm tra lại GEMINI_API_KEY trong file .env");
                         throw new RuntimeException(
@@ -117,8 +129,24 @@ public class GeminiService {
                                         + "Vui lòng cập nhật GEMINI_API_KEY hợp lệ trong file .env",
                                 e);
                     }
+
+                    // 503 (High Demand / Overloaded) hoặc 429 (Quota exceeded / Rate Limit)
+                    if (statusCode == 503 || statusCode == 429 || responseBody.contains("high demand") || responseBody.contains("quota")) {
+                        log.warn("Gemini model [{}] đang bị quá tải hoặc quá giới hạn (HTTP {} - High Demand). Chuyển ngay sang model tiếp theo trong danh sách ưu tiên...",
+                                model, statusCode);
+                        lastException = e;
+                        break; // Bỏ qua model này, sang model tiếp theo ngay lập tức
+                    }
+
+                    // 404 Not Found = Model không tồn tại hoặc đã bị khai tử
+                    if (statusCode == 404) {
+                        log.warn("Gemini model [{}] không khả dụng (HTTP 404). Chuyển sang model tiếp theo.", model);
+                        lastException = e;
+                        break;
+                    }
+
                     log.warn("Gemini model [{}] attempt {}/{} thất bại (HTTP {}): {}",
-                            model, attempt, MAX_RETRIES, e.getStatusCode().value(), e.getMessage());
+                            model, attempt, MAX_RETRIES, statusCode, e.getMessage());
                     lastException = e;
                 } catch (Exception e) {
                     log.warn("Gemini model [{}] attempt {}/{} thất bại: {}",
@@ -126,10 +154,10 @@ public class GeminiService {
                     lastException = e;
                 }
 
-                // Exponential backoff giữa các lần retry: 1s → 2s → 4s
+                // Exponential backoff giữa các lần retry: 1s
                 if (attempt < MAX_RETRIES) {
                     try {
-                        long backoffMs = (long) Math.pow(2, attempt - 1) * 1000L;
+                        long backoffMs = 1000L;
                         log.info("Waiting {}ms before retry...", backoffMs);
                         Thread.sleep(backoffMs);
                     } catch (InterruptedException ie) {
@@ -138,11 +166,10 @@ public class GeminiService {
                 }
             }
 
-            log.warn("Gemini model [{}] thất bại sau {} lần thử, chuyển sang model tiếp theo.", model, MAX_RETRIES);
+            log.warn("Gemini model [{}] không thành công, chuyển sang model tiếp theo.", model);
         }
 
-        throw new RuntimeException("Tất cả Gemini models đều thất bại sau " + MAX_RETRIES
-                + " lần thử mỗi model. Lỗi cuối: "
+        throw new RuntimeException("Tất cả Gemini models đều thất bại. Lỗi cuối: "
                 + (lastException != null ? lastException.getMessage() : "Unknown error"));
     }
 }

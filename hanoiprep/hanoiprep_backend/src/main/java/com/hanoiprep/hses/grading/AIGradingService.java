@@ -259,10 +259,8 @@ public class AIGradingService {
                         String feedback = result.getAiFeedback() != null ? result.getAiFeedback()
                                         : "Đã hoàn thành tiêu chí.";
 
-                        // Đảm bảo điểm nằm trong khoảng 0 đến maxScore và làm tròn 2 chữ số thập phân
-                        double finalScore = Math
-                                        .round(Math.min(Math.max(0.0, rawScore), matchedRubric.getMaxScore()) * 100.0)
-                                        / 100.0;
+                        // Điểm chấm trung thực theo đánh giá AI, không vượt quá maxScore của tiêu chí
+                        double finalScore = Math.min(Math.max(0.0, rawScore), matchedRubric.getMaxScore());
 
                         detailsToSave.add(SubmissionDetail.builder()
                                         .submission(submission)

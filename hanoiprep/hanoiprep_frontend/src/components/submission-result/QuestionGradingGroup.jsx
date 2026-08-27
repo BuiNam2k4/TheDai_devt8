@@ -6,6 +6,12 @@ const getScoreColor = (pct) => {
   return '#ef4444';
 };
 
+const formatScore = (num) => {
+  if (num === null || num === undefined || isNaN(num)) return '0';
+  const val = Number(num);
+  return Number.isInteger(val) ? val.toString() : val.toFixed(2).replace(/\.?0+$/, '');
+};
+
 const QuestionGradingGroup = ({
   groupedDetails,
   overallScorePercent,
@@ -106,7 +112,7 @@ const QuestionGradingGroup = ({
                   border: `1px solid ${qColor}44`,
                 }}
               >
-                Đạt {qAwarded.toFixed(1)} / {qMaxScore > 0 ? qMaxScore.toFixed(1) : '?'} điểm
+                Đạt {formatScore(qAwarded)} / {qMaxScore > 0 ? formatScore(qMaxScore) : '?'} điểm
               </span>
             </div>
 
@@ -222,11 +228,11 @@ const QuestionGradingGroup = ({
                         ) : (
                           <>
                             <span style={{ fontSize: '1.1rem', fontWeight: 800, color: detailColor }}>
-                              {detail.awardedScore?.toFixed(1)}
+                              {formatScore(detail.awardedScore)}
                             </span>
                             {detail.rubric && (
                               <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                                /{detail.rubric.maxScore}
+                                /{formatScore(detail.rubric.maxScore)}
                               </span>
                             )}
                           </>
